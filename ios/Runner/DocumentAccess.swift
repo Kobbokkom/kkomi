@@ -6,7 +6,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewControllerDelegate,
-  QLPreviewControllerDataSource, QLPreviewControllerDelegate {
+  QLPreviewControllerDataSource, QLPreviewControllerDelegate, FlutterSceneLifeCycleDelegate {
   private static let imageExtensions: Set<String> = [
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "avif", "heic", "heif", "tif", "tiff",
   ]
@@ -48,8 +48,20 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
     }
   }
 
-  @discardableResult
-  func open(_ url: URL) -> Bool {
+  func scene(_ scene: UIScene, willConnectTo session: UISceneSession,
+             options connectionOptions: UIScene.ConnectionOptions?) -> Bool {
+    self.scene(scene, openURLContexts: connectionOptions?.urlContexts ?? [])
+  }
+
+  func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) -> Bool {
+    var handled = false
+    for context in contexts where open(context.url) {
+      handled = true
+    }
+    return handled
+  }
+
+  private func open(_ url: URL) -> Bool {
     guard url.isFileURL, Self.extensions.contains(url.pathExtension.lowercased()) else {
       return false
     }
