@@ -20,9 +20,6 @@ import UIKit
         return presenter
       }
       registrar.register(DocumentWebViewFactory(registrar: registrar), withId: "kkomi/viewer")
-      if let url = launchOptions?[.url] as? URL {
-        documents?.open(url)
-      }
     }
     return launched
   }
