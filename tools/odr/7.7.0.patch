@@ -1,0 +1,186 @@
+diff --git a/src/odr/internal/html/sheet.cpp b/src/odr/internal/html/sheet.cpp
+index c2768f9..01d5cec 100644
+--- a/src/odr/internal/html/sheet.cpp
++++ b/src/odr/internal/html/sheet.cpp
+@@ -791,6 +791,11 @@ void write_row(const SheetRows &rows, RowCursor &at, const WritingState &state,
+                   : cell_value_type == ValueType::date ? "odr-value-type-date"
+                   : cell_value_type == ValueType::time ? "odr-value-type-time"
+                                                        : "";
++              if (wraps && table_row_style.use_optimal_height.value_or(
++                               !table_row_style.height.has_value())) {
++                clazz += clazz.empty() ? "odr-sheet-wrap-grow"
++                                       : " odr-sheet-wrap-grow";
++              }
+               if (lock != nullptr) {
+                 clazz += clazz.empty() ? "odr-locked" : " odr-locked";
+               }
+diff --git a/src/odr/internal/odf/odf_style.cpp b/src/odr/internal/odf/odf_style.cpp
+index be401e9..51f7aec 100644
+--- a/src/odr/internal/odf/odf_style.cpp
++++ b/src/odr/internal/odf/odf_style.cpp
+@@ -2,6 +2,7 @@
+
+ #include <odr/internal/odf/odf_document.hpp>
+ #include <odr/internal/odf/odf_parser.hpp>
++#include <odr/internal/util/string_util.hpp>
+ #include <odr/internal/xml/xml_util.hpp>
+
+ #include <array>
+@@ -550,6 +551,11 @@ void Style::resolve_table_row_style_(const pugi::xml_node node,
+       height.has_value()) {
+     result.height = height;
+   }
++  if (const pugi::xml_attribute optimal =
++          table_row_properties.attribute("style:use-optimal-row-height")) {
++    const std::string_view value = util::string::trim_view(optimal.value());
++    result.use_optimal_height = value == "true" || value == "1";
++  }
+ }
+
+ void Style::resolve_table_cell_style_(const pugi::xml_node node,
+@@ -562,9 +568,13 @@ void Style::resolve_table_cell_style_(const pugi::xml_node node,
+       vertical_align.has_value()) {
+     result.vertical_align = vertical_align;
+   }
+-  if (const pugi::xml_attribute wrap_option =
+-          table_cell_properties.attribute("style:wrap-option")) {
++  const pugi::xml_attribute wrap_option =
++      table_cell_properties.attribute("fo:wrap-option");
++  if (wrap_option) {
+     result.wrap_text = std::strcmp("wrap", wrap_option.value()) == 0;
++  } else if (const pugi::xml_attribute legacy_wrap_option =
++                 table_cell_properties.attribute("style:wrap-option")) {
++    result.wrap_text = std::strcmp("wrap", legacy_wrap_option.value()) == 0;
+   }
+   result.background_color =
+       read_background(table_cell_properties.attribute("fo:background-color"),
+diff --git a/src/odr/internal/ooxml/ooxml_file.cpp b/src/odr/internal/ooxml/ooxml_file.cpp
+index cc32350..3a1d9e9 100644
+--- a/src/odr/internal/ooxml/ooxml_file.cpp
++++ b/src/odr/internal/ooxml/ooxml_file.cpp
+@@ -98,6 +98,28 @@ OfficeOpenXmlFile::decrypt(const std::string &password) const {
+   return decrypted;
+ }
+
++std::string OfficeOpenXmlFile::read_workbook_xml() const {
++  if (file_type() != FileType::office_open_xml_workbook || password_encrypted()) {
++    throw UnsupportedOperation();
++  }
++  const auto workbook = m_files->open(AbsPath("/xl/workbook.xml"));
++  if (!workbook) {
++    throw FileReadError();
++  }
++  constexpr std::size_t max_workbook_xml_bytes = 8 * 1024 * 1024;
++  const std::size_t size = workbook->size();
++  if (size == 0 || size > max_workbook_xml_bytes) {
++    throw FileReadError();
++  }
++  const auto stream = workbook->stream();
++  std::string bytes = util::stream::read(*stream, size);
++  if (bytes.size() != size || stream->peek() != std::char_traits<char>::eof() ||
++      stream->bad()) {
++    throw FileReadError();
++  }
++  return bytes;
++}
++
+ bool OfficeOpenXmlFile::is_decodable() const noexcept {
+   return m_encryption_state != EncryptionState::encrypted;
+ }
+diff --git a/src/odr/internal/ooxml/ooxml_file.hpp b/src/odr/internal/ooxml/ooxml_file.hpp
+index efc5e34..f247972 100644
+--- a/src/odr/internal/ooxml/ooxml_file.hpp
++++ b/src/odr/internal/ooxml/ooxml_file.hpp
+@@ -49,6 +49,8 @@ public:
+
+   [[nodiscard]] std::shared_ptr<abstract::Document> document() const override;
+
++  [[nodiscard]] std::string read_workbook_xml() const;
++
+ private:
+   std::shared_ptr<abstract::ReadableFilesystem> m_files;
+   std::shared_ptr<zip::util::Archive> m_archive;
+diff --git a/src/odr/style.cpp b/src/odr/style.cpp
+index 4d82d71..3f7abdf 100644
+--- a/src/odr/style.cpp
++++ b/src/odr/style.cpp
+@@ -84,6 +84,7 @@ void TableColumnStyle::override(const TableColumnStyle &other) {
+
+ void TableRowStyle::override(const TableRowStyle &other) {
+   override_if_set(height, other.height);
++  override_if_set(use_optimal_height, other.use_optimal_height);
+ }
+
+ void TableCellStyle::override(const TableCellStyle &other) {
+diff --git a/src/odr/style.hpp b/src/odr/style.hpp
+index 367e238..37f9684 100644
+--- a/src/odr/style.hpp
++++ b/src/odr/style.hpp
+@@ -213,6 +213,7 @@ struct TableColumnStyle final {
+ /// Represents a style for table rows.
+ struct TableRowStyle final {
+   std::optional<Measure> height;
++  std::optional<bool> use_optimal_height;
+
+   void override(const TableRowStyle &other);
+ };
+diff --git a/wasm/js/index.js b/wasm/js/index.js
+index 5c08ee0..97b480a 100644
+--- a/wasm/js/index.js
++++ b/wasm/js/index.js
+@@ -66,6 +66,10 @@ export class Document {
+     return this;
+   }
+
++  readSpreadsheetWorkbook() {
++    return unwrap(this.#core.readSpreadsheetWorkbook(this.#handle));
++  }
++
+   listViews() {
+     return unwrap(this.#core.listViews(this.#handle));
+   }
+diff --git a/wasm/src/wasm_file.cpp b/wasm/src/wasm_file.cpp
+index 37eec93..e05b4e2 100644
+--- a/wasm/src/wasm_file.cpp
++++ b/wasm/src/wasm_file.cpp
+@@ -1,8 +1,10 @@
+ #include <odr_wasm.hpp>
+
++#include <odr/exceptions.hpp>
+ #include <odr/file.hpp>
+ #include <odr/odr.hpp>
+
++#include <odr/internal/ooxml/ooxml_file.hpp>
+ #include <odr/internal/util/odr_meta_util.hpp>
+
+ #include <emscripten/bind.h>
+@@ -111,6 +113,21 @@ emscripten::val decrypt(const Handle handle, const std::string &password) {
+   });
+ }
+
++emscripten::val read_spreadsheet_workbook(const Handle handle) {
++  return guarded([&] {
++    const auto &file = session(handle).file;
++    if (file.file_type() != FileType::office_open_xml_workbook) {
++      throw UnsupportedOperation();
++    }
++    const auto workbook = std::dynamic_pointer_cast<internal::ooxml::OfficeOpenXmlFile>(
++        file.as_document_file().impl());
++    if (!workbook) {
++      throw UnsupportedOperation();
++    }
++    return ok(to_uint8_array(workbook->read_workbook_xml()));
++  });
++}
++
+ emscripten::val file_name(const Handle handle) {
+   return guarded(
+       [&] { return ok(emscripten::val(session(handle).file.file().name())); });
+@@ -190,6 +207,7 @@ EMSCRIPTEN_BINDINGS(odr_file) {
+   emscripten::function("isPasswordEncrypted",
+                        &odr::wasm::is_password_encrypted);
+   emscripten::function("decrypt", &odr::wasm::decrypt);
++  emscripten::function("readSpreadsheetWorkbook", &odr::wasm::read_spreadsheet_workbook);
+   emscripten::function("fileType", &odr::wasm::file_type);
+   emscripten::function("fileName", &odr::wasm::file_name);
+   emscripten::function("isAnnotatable", &odr::wasm::is_annotatable);

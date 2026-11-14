@@ -72,7 +72,7 @@ private class DocumentWebView(
     private val startupTimeout = Runnable { failStartup() }
     private var hwpPrintResult: MethodChannel.Result? = null
     private var printing = false
-    private var hwpCanPrint = false
+    private var canPrint = extension in printableFormats && extension != "ods"
     private var slideMedia: PrintAttributes.MediaSize? = null
     private val hwpPrintTimeout = Runnable { failHwpPrint("PDF를 준비하는 데 시간이 너무 오래 걸립니다.") }
 
@@ -174,8 +174,8 @@ private class DocumentWebView(
                     "error" -> channel.invokeMethod(event, data.optString("value"))
                     "password", "partialPreview" -> channel.invokeMethod(event, data.optBoolean("value"))
                     "canPrint" -> {
-                        hwpCanPrint = data.optBoolean("value")
-                        channel.invokeMethod(event, hwpCanPrint)
+                        canPrint = data.optBoolean("value")
+                        channel.invokeMethod(event, canPrint)
                     }
                     "printReady" -> {
                         val dimensions = data.optJSONObject("value")
@@ -189,7 +189,7 @@ private class DocumentWebView(
                         val dimensions = data.optJSONObject("value")
                         val width = dimensions?.optInt("width") ?: 0
                         val height = dimensions?.optInt("height") ?: 0
-                        if (extension in slideFormats && width in 1000..40000 && height in 1000..40000) {
+                        if (extension in slideFormats && width in 1000..56000 && height in 1000..56000) {
                             val label = labels?.optString("slideSize", "슬라이드 크기") ?: "슬라이드 크기"
                             slideMedia = PrintAttributes.MediaSize("kkomi-slide", label, width, height)
                         }
@@ -248,31 +248,30 @@ private class DocumentWebView(
                         result.error("print", "이미 PDF를 준비하고 있습니다.", null)
                         return@setMethodCallHandler
                     }
-                    if (extension == "hwp" || extension == "hwpx") {
-                        if (!hwpCanPrint) {
-                            result.error("print", "이 문서는 PDF로 저장할 수 없습니다.", null)
-                        } else {
-                            hwpPrintResult = result
-                            handler.postDelayed(hwpPrintTimeout, 90_000)
-                            webView.evaluateJavascript("window.prepareHwpPrint()", null)
-                        }
+                    if (!canPrint) {
+                        result.error("print", "이 문서는 PDF로 저장할 수 없습니다.", null)
                         return@setMethodCallHandler
-                    } else if (extension in printableFormats) {
-                        val isSlide = extension in slideFormats
-                        val paper = if (isSlide) {
-                            slideMedia ?: PrintAttributes.MediaSize.ISO_A4.asLandscape()
-                        } else {
-                            PrintAttributes.MediaSize.ISO_A4
-                        }
-                        val attributes = PrintAttributes.Builder().setMediaSize(paper).apply {
-                            if (slideMedia != null) setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                        }.build()
-                        try {
-                            startPrint(attributes, fitSlides = isSlide)
-                        } catch (_: RuntimeException) {
-                            result.error("print", "PDF를 저장할 수 없습니다.", null)
-                            return@setMethodCallHandler
-                        }
+                    }
+                    if (extension == "hwp" || extension == "hwpx") {
+                        hwpPrintResult = result
+                        handler.postDelayed(hwpPrintTimeout, 90_000)
+                        webView.evaluateJavascript("window.prepareHwpPrint()", null)
+                        return@setMethodCallHandler
+                    }
+                    val isSlide = extension in slideFormats
+                    val paper = if (isSlide) {
+                        slideMedia ?: PrintAttributes.MediaSize.ISO_A4.asLandscape()
+                    } else {
+                        PrintAttributes.MediaSize.ISO_A4
+                    }
+                    val attributes = PrintAttributes.Builder().setMediaSize(paper).apply {
+                        if (slideMedia != null) setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                    }.build()
+                    try {
+                        startPrint(attributes, fitSlides = isSlide)
+                    } catch (_: RuntimeException) {
+                        result.error("print", "PDF를 저장할 수 없습니다.", null)
+                        return@setMethodCallHandler
                     }
                 }
                 else -> {

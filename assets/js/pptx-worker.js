@@ -20,7 +20,8 @@ self.onmessage = async ({ data: { bytes } }) => {
     const { width, height } = getSlideSize(presentation);
     const widthMils = Math.round(width * 1000 / emuPerInch);
     const heightMils = Math.round(height * 1000 / emuPerInch);
-    if (![widthMils, heightMils].every(value => Number.isInteger(value) && value >= 1000 && value <= 40000)) {
+    // OOXML ST_SlideSizeCoordinate allows one through 56 inches on each axis.
+    if (![width, height].every(value => Number.isInteger(value) && value >= emuPerInch && value <= 56 * emuPerInch)) {
       throw new Error('Unsupported slide dimensions');
     }
     const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(1, 1).getContext('2d') : null;

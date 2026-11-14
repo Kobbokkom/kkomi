@@ -153,7 +153,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   private let hasFile: Bool
   private var pageCount = 0
   private var startupTimeout: DispatchWorkItem?
-  private var canPrintHwp = false
+  private lazy var canPrint = Self.printableFormats.contains(fileExtension) && fileExtension != "ods"
   private var slidePaper: CGSize?
   private var printResult: FlutterResult?
   private var printTimeout: DispatchWorkItem?
@@ -289,8 +289,8 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
       pageCount = value as? Int ?? 0
       channel.invokeMethod(event, arguments: pageCount)
     case "canPrint":
-      canPrintHwp = value as? Bool ?? false
-      channel.invokeMethod(event, arguments: canPrintHwp)
+      canPrint = value as? Bool ?? false
+      channel.invokeMethod(event, arguments: canPrint)
     case "outline":
       if isHwp, let outline = value as? String {
         channel.invokeMethod(event, arguments: outline)
@@ -299,7 +299,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
       channel.invokeMethod(event, arguments: value)
     case "printMedia":
       if isSlide, let size = dimensions(value),
-        (1000...40000).contains(size.width), (1000...40000).contains(size.height) {
+        (1000...56000).contains(size.width), (1000...56000).contains(size.height) {
         slidePaper = CGSize(width: size.width * 0.072, height: size.height * 0.072)
       }
     case "printReady":
@@ -321,8 +321,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   }
 
   private func beginPrint(_ result: @escaping FlutterResult) {
-    let printable = isHwp ? canPrintHwp : Self.printableFormats.contains(fileExtension)
-    guard pageCount > 0, printable else {
+    guard pageCount > 0, canPrint else {
       result(FlutterError(code: "print", message: "이 문서는 PDF로 저장할 수 없습니다.", details: nil))
       return
     }

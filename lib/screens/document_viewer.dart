@@ -41,7 +41,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
   int? _matches;
   int _currentMatch = 0;
   bool _preparingPdf = false;
-  bool _hwpCanPrint = false;
+  bool? _canPrint;
   bool _imageFit = true;
   bool _partialPreview = false;
   List<_OutlineItem> _outline = const [];
@@ -124,7 +124,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
         case 'password':
           unawaited(_promptPassword(call.arguments as bool));
         case 'canPrint':
-          setState(() => _hwpCanPrint = call.arguments == true);
+          setState(() => _canPrint = call.arguments == true);
         case 'partialPreview':
           setState(() => _partialPreview = call.arguments == true);
         case 'error':
@@ -519,9 +519,11 @@ class _DocumentViewerState extends State<DocumentViewer> {
     final directSave =
         ready &&
         (widget.convertedPdf != null ||
-            (widget.document.isHwp && _hwpCanPrint));
+            (widget.document.isHwp && _canPrint == true));
     final canSave =
-        ready && !_preparingPdf && (directSave || widget.document.canExportPdf);
+        ready &&
+        !_preparingPdf &&
+        (directSave || (widget.document.canExportPdf && _canPrint != false));
     return Scaffold(
       appBar: AppBar(
         backgroundColor: _isPdf ? Colors.white : null,

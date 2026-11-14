@@ -1,6 +1,9 @@
 OpenDocument.core @opendocument/odr-core 7.7.0
 License: MPL-2.0 (see odr-LICENSE)
-Source: https://github.com/opendocument-app/OpenDocument.core/tree/v7.7.0
-Distribution: https://registry.npmjs.org/@opendocument/odr-core/-/odr-core-7.7.0.tgz
-Package integrity: sha512-2rr9FVzDGaz+0bBtvqcE/3NqsAa+C+ahGA/URGK7cMR6GCxN77P5gpd+5v82kCgRijP3AexFUQfl4eeXyWTXZA==
-Packaged files are unmodified. The package's index.js is named odr-7.7.0.mjs here.
+Upstream source: https://github.com/opendocument-app/OpenDocument.core/tree/fae77ff7232cc79eecaebeb9e6839acf568d09c2
+Modified source: the Flutter app bundle includes tools/odr/7.7.0.patch under the MPL-2.0.
+Apply it to the revision above to obtain the corresponding source. It adds bounded workbook metadata and fixes ODS cell wrapping.
+Third-party notices: odr-THIRD-PARTY-NOTICES.zip.
+Build: bash tools/odr/build.sh with Conan 2, CMake, and Ninja (Emscripten 3.1.73 via upstream profile).
+For a host compiler newer than Conan recognizes, set ODR_BUILD_PROFILE to an absolute compatible Conan profile.
+The built index.js is named odr-7.7.0.mjs here.

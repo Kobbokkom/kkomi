@@ -89,12 +89,12 @@ globalThis.openDocument = async (extension, localizedStrings) => {
     if (extension === 'hwp' || extension === 'hwpx') {
       const { openHwp } = await import('./hwp-viewer.js');
       documentView = await openHwp(bytes, viewer, onPage, requestPassword);
-      report('canPrint', documentView.canPrint === true);
     } else {
       const { openOther } = await import('./other-viewer.js');
       documentView = await openOther(extension, bytes, viewer, onPage, requestPassword,
         (width, height) => report('printMedia', { width, height }));
     }
+    if (typeof documentView.canPrint === 'boolean') report('canPrint', documentView.canPrint);
     if (documentView.partialPreview) report('partialPreview', true);
     report('ready', documentView.pageCount);
     if (documentView.readOutline) {

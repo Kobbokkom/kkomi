@@ -66,6 +66,10 @@ export class Document {
     return this;
   }
 
+  readSpreadsheetWorkbook() {
+    return unwrap(this.#core.readSpreadsheetWorkbook(this.#handle));
+  }
+
   listViews() {
     return unwrap(this.#core.listViews(this.#handle));
   }

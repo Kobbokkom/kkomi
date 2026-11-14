@@ -461,6 +461,9 @@ export async function openOther(extension, bytes, viewer, reportPage, requestPas
     return (page.shadowRoot?.querySelector(".office-content") ?? page).textContent;
   });
   return Object.assign(navigation, occurrenceSearch, {
+    canPrint: extension === "ods"
+      ? pages.some(page => !page.classList.contains("office-sheet-no-print"))
+      : undefined,
     partialPreview: pages.some(page => page.hasAttribute("data-partial-preview")),
   });
 }

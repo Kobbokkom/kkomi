@@ -35,7 +35,7 @@ function xlsxVisibility(bytes) {
   return children(lists[0], namespace, 'sheet').map(sheet => {
     const state = sheet.getAttribute('state') ?? 'visible';
     if (!['visible', 'hidden', 'veryHidden'].includes(state)) throw visibilityError();
-    return [sheet.getAttribute('name'), state === 'visible'];
+    return [sheet.getAttribute('name'), { visible: state === 'visible', printable: true }];
   });
 }
 
@@ -71,35 +71,38 @@ function odsVisibility(content, styles) {
   }
 
   return children(spreadsheet, table, 'table').map(sheet => {
+    const print = sheet.getAttributeNS(table, 'print')?.trim();
+    const printable = print === undefined || print === 'true' || print === '1';
     let name = sheet.getAttributeNS(table, 'style-name');
     const seen = new Set();
+    let visible;
     while (name) {
       const node = tableStyles.get(name);
       if (!node || seen.has(name)) throw visibilityError();
       seen.add(name);
-      const visible = display(node);
-      if (visible !== undefined) return [sheet.getAttributeNS(table, 'name'), visible];
+      visible = display(node);
+      if (visible !== undefined) break;
       name = node.getAttributeNS(style, 'parent-style-name');
     }
-    return [sheet.getAttributeNS(table, 'name'), display(defaultStyle) ?? true];
+    return [sheet.getAttributeNS(table, 'name'), { visible: visible ?? display(defaultStyle) ?? true, printable }];
   });
 }
 
-export function visibleOfficeSheets(type, metadata, views) {
+export function officeSheetOptions(type, metadata, views) {
   let sheets;
   if (type === 'xlsx') sheets = xlsxVisibility(metadata?.[0]);
   else if (type === 'ods') sheets = odsVisibility(metadata?.[0], metadata?.[1]);
   else return null;
 
   const byName = new Map();
-  for (const [name, visible] of sheets) {
+  for (const [name, options] of sheets) {
     if (!name || byName.has(name)) throw visibilityError();
-    byName.set(name, visible);
+    byName.set(name, options);
   }
   return views.map(({ name }) => {
     if (!byName.has(name)) throw visibilityError();
-    const visible = byName.get(name);
+    const options = byName.get(name);
     byName.delete(name);
-    return visible;
+    return options;
   });
 }

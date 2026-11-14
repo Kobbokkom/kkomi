@@ -323,6 +323,7 @@ def run(device):
         ("office-sheets.xls", "1 / 2"),
         ("office-sheets.xlsx", "1 / 2"),
         ("hidden-sheet.xlsx", "Office sheet one"),
+        ("ods-print-options.ods", "1 / 2"),
         ("office-slides.ppt", "1 / 2"),
         ("office-slides.pptx", "1 / 2"),
         ("complex-slides.pptx", "1 / 4"),
@@ -407,6 +408,21 @@ def run(device):
                 text = subprocess.check_output(["pdftotext", str(pdf), "-"], encoding="utf-8")
                 words = " ".join(text.split())
                 assert "Office sheet one" in words and "Office sheet two" not in words, text
+        if name == "ods-print-options.ods":
+            device.tap("검색")
+            device.wait(lambda node: node.get("class") == "android.widget.EditText" and
+                        node.get("focused") == "true", "sheet search field")
+            device.text("two")
+            device.has("검색 결과가 있는 페이지 1개")
+            device.back()
+            device.tap("검색 닫기")
+            device.tap("문서 메뉴")
+            with tempfile.TemporaryDirectory() as directory:
+                pdf = Path(directory) / "sheet.pdf"
+                export_pdf(device, "kkomi-e2e-ods-print", local_copy=pdf)
+                text = subprocess.check_output(["pdftotext", str(pdf), "-"], encoding="utf-8")
+                assert text.count("\f") == 1 and "two" not in text, text
+                assert {"Office", "sheet", "one"}.issubset(text.split()), text
         if name == "office-slides.pptx":
             device.tap("문서 메뉴")
             with tempfile.TemporaryDirectory() as directory:

@@ -84,16 +84,13 @@ self.onmessage = async ({ data: { extension, bytes, password } }) => {
     if (doc.fileType !== odr.enums.FileType[format.type]) {
       throw new Error("문서 형식과 확장자가 일치하지 않아요.");
     }
+    const metadata = format.type === "xlsx" && encrypted
+      ? [doc.readSpreadsheetWorkbook()]
+      : archive.metadata;
     const views = doc.listViews().slice(1);
     if (views.length > maxViews) throw new Error("페이지가 너무 많아 문서를 표시할 수 없어요.");
     const { html } = doc.render();
     if (html.length > maxMarkupLength) throw new Error("문서가 너무 커서 표시할 수 없어요.");
-    let metadata = archive.metadata;
-    if (format.type === "xlsx" && encrypted) {
-      const { unzipSync } = await import("./vendor/fflate-0.8.3.mjs");
-      const files = unzipSync(doc.save(), { filter: part => part.name === "xl/workbook.xml" });
-      metadata = sheetMetadata(files, format.type);
-    }
     self.postMessage({ html, views, metadata });
   } catch (error) {
     self.postMessage({ error: error.name ?? "Error", message: error.message ?? "" });
