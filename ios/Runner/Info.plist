@@ -58,18 +58,31 @@
 				<string>com.adobe.pdf</string>
 				<string>com.microsoft.word.doc</string>
 				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>org.openxmlformats.wordprocessingml.template</string>
+				<string>org.openxmlformats.wordprocessingml.document.macroenabled</string>
+				<string>org.oasis-open.opendocument.text</string>
+				<string>public.rtf</string>
 				<string>com.microsoft.excel.xls</string>
 				<string>org.openxmlformats.spreadsheetml.sheet</string>
+				<string>org.openxmlformats.spreadsheetml.template</string>
+				<string>org.openxmlformats.spreadsheetml.sheet.macroenabled</string>
+				<string>org.oasis-open.opendocument.spreadsheet</string>
 				<string>com.microsoft.powerpoint.ppt</string>
 				<string>org.openxmlformats.presentationml.presentation</string>
+				<string>org.openxmlformats.presentationml.slideshow</string>
+				<string>org.openxmlformats.presentationml.template</string>
+				<string>org.oasis-open.opendocument.presentation</string>
 				<string>public.plain-text</string>
 				<string>public.comma-separated-values-text</string>
+				<string>public.tab-separated-values-text</string>
+				<string>net.daringfireball.markdown</string>
 				<string>public.jpeg</string>
 				<string>public.png</string>
 				<string>com.compuserve.gif</string>
 				<string>org.webmproject.webp</string>
 				<string>com.microsoft.bmp</string>
 				<string>public.avif</string>
+				<string>public.svg-image</string>
 				<string>public.heic</string>
 				<string>public.heif</string>
 				<string>public.tiff</string>

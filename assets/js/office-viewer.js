@@ -1,4 +1,6 @@
 import { viewerText } from './viewer-strings.js';
+import { officeFormats } from './office-formats.js';
+import { visibleOfficeSheets } from './office-sheet-visibility.js';
 
 const tags = new Set((
   "div span x-p x-s p h1 h2 h3 h4 h5 h6 table thead tbody tfoot tr th td col colgroup " +
@@ -18,6 +20,8 @@ const officeStyle = `
   .odr-sheet { margin:0; }
   .office-name { margin:0 0 8px; font:600 15px/1.5 system-ui,sans-serif; }
   .office-cut { margin:10px 0 0; font:13px/1.5 system-ui,sans-serif; color:#625f56; }
+  :host(.office-pptx) { padding:0; }
+  :host(.office-pptx) img { display:block; width:100%; height:auto; aspect-ratio:var(--slide-ratio); object-fit:contain; }
   @media screen {
     ::highlight(docx-matches) { background-color:#ffd50070; }
     ::highlight(docx-current-match) { background-color:#ffa000b0; }
@@ -29,6 +33,11 @@ const officeStyle = `
     .odr-page-outer { margin:0; box-shadow:none; break-after:auto; zoom:var(--office-print-scale,1); }
     :host(.office-slide) .office-content { overflow:hidden; height:calc(100vh - 1px); }
     :host(.office-slide) .odr-page-outer { margin:0 auto; }
+    :host(.office-pptx) { break-inside:avoid; }
+    :host(.office-pptx) .office-content {
+      display:grid; place-items:center; width:var(--office-pptx-print-width); height:var(--office-pptx-print-height);
+    }
+    :host(.office-pptx) img { width:var(--office-pptx-image-width); height:var(--office-pptx-image-height); }
     .office-name { display:none; }
     .odr-sheet { zoom:var(--office-print-scale,1); }
     .odr-gridlines-soft { --odr-sheet-line:transparent; }
@@ -40,9 +49,9 @@ const sheetPrintMargin = `@page { margin: 1in 0.75in; }`;
 // Android's spreadsheet print job uses portrait A4.
 const sheetPrintWidth = (210 / 25.4 - 1.5) * 96;
 
-function renderOffice(extension, bytes, requestPassword) {
+function renderOffice(extension, bytes, requestPassword, script = './office-worker.js') {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./office-worker.js", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL(script, import.meta.url), { type: "module" });
     let timeout;
     const finish = () => {
       clearTimeout(timeout);
@@ -75,7 +84,7 @@ function renderOffice(extension, bytes, requestPassword) {
         return;
       }
       finish();
-      if (typeof data.html === "string") resolve(data);
+      if (typeof data.html === "string" || Array.isArray(data.images)) resolve(data);
       else if (data.error === "AbortError") reject(new DOMException("Password cancelled", "AbortError"));
       else reject(new Error(data.message || "Office 문서를 읽을 수 없어요."));
     };
@@ -233,18 +242,91 @@ export function docxSearch(page) {
   };
 }
 
+function useSlidePrintMargin() {
+  const style = document.createElement("style");
+  style.media = "print";
+  style.textContent = "@page { margin: 0; }";
+  document.head.append(style);
+}
+
+async function pptxPages(extension, bytes, reportPrintSize) {
+  const { images, widthMils, heightMils } = await renderOffice(extension, bytes, null, './pptx-worker.js');
+  const width = widthMils * 0.096;
+  const height = heightMils * 0.096;
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync(officeStyle);
+  const urls = [];
+  const release = () => urls.forEach(url => URL.revokeObjectURL(url));
+  window.addEventListener('pagehide', release, { once: true });
+  const pages = [];
+  try {
+    const parser = new DOMParser();
+    for (const svg of images) {
+      const slide = parser.parseFromString(svg, 'image/svg+xml').documentElement;
+      if (slide.localName !== 'svg') throw new Error('Invalid slide image');
+      const text = [...slide.querySelectorAll('text:not([aria-hidden="true"])')]
+        .map(node => node.textContent.trim()).filter(Boolean).join('\n');
+      const page = document.createElement('section');
+      page.className = 'other-document-page office-page office-slide office-pptx';
+      page.style.setProperty('--slide-ratio', `${widthMils} / ${heightMils}`);
+      const shadow = page.attachShadow({ mode: 'open' });
+      shadow.adoptedStyleSheets = [sheet];
+      const root = document.createElement('div');
+      root.className = 'office-content';
+      const image = document.createElement('img');
+      const label = viewerText('page', '{page}쪽', pages.length + 1);
+      image.alt = text ? `${label}: ${text}` : label;
+      // Keep slide XML in the browser's inert image context, and expose plain text to existing search.
+      const style = parser.parseFromString('<style xmlns="http://www.w3.org/2000/svg">text{font-variant-ligatures:none}</style>', 'image/svg+xml').documentElement;
+      slide.prepend(style);
+      const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(slide)], { type: 'image/svg+xml' }));
+      urls.push(url);
+      image.src = url;
+      const search = document.createElement('span');
+      search.hidden = true;
+      search.textContent = text;
+      root.append(image, search);
+      shadow.append(root);
+      await image.decode();
+      pages.push(page);
+    }
+  } catch (error) {
+    window.removeEventListener('pagehide', release);
+    release();
+    throw error;
+  }
+  useSlidePrintMargin();
+  globalThis.fitOfficeSlides = (printWidth, printHeight) => {
+    const style = document.documentElement.style;
+    const pageHeight = Math.floor(printHeight) - 1;
+    const scale = Math.min(1, printWidth / width, pageHeight / height);
+    style.setProperty('--office-print-width', `${Math.ceil(printWidth)}px`);
+    style.setProperty('--office-pptx-print-width', `${printWidth}px`);
+    style.setProperty('--office-pptx-print-height', `${pageHeight}px`);
+    style.setProperty('--office-pptx-image-width', `${width * scale}px`);
+    style.setProperty('--office-pptx-image-height', `${height * scale}px`);
+  };
+  globalThis.fitOfficeSlides(width, height);
+  reportPrintSize?.(widthMils, heightMils);
+  return pages;
+}
+
 export async function officePages(extension, bytes, requestPassword, reportPrintSize) {
-  const { html, views } = await renderOffice(extension, bytes, requestPassword);
+  const { type, kind } = officeFormats.get(extension);
+  // Encrypted OOXML opens through ODR's existing password flow in its compound-file container.
+  if (type === 'pptx' && bytes[0] === 0x50 && bytes[1] === 0x4b) {
+    return pptxPages(extension, bytes, reportPrintSize);
+  }
+  const { html, views, metadata } = await renderOffice(extension, bytes, requestPassword);
   // Parsing inside a template keeps embedded resources inert until individually allowed.
   const template = document.createElement("template");
   template.innerHTML = html;
   const markup = template.content;
-  const kind = extension.startsWith("ppt") ? "slide" : extension.startsWith("xls") ? "sheet" : "word";
   const css = Array.from(markup.querySelectorAll("style"), style => style.textContent).join("\n");
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(css + officeStyle);
   if (kind === "word") {
-    if (extension === "doc") {
+    if (type === "doc") {
       const pages = markup.querySelectorAll(".odr-pages > .odr-page-outer");
       if (pages.length > 500) throw new Error("페이지가 너무 많아 문서를 표시할 수 없어요.");
       if (pages.length) return Array.from(pages, page => officePage("doc-page", sheet, [page]));
@@ -253,13 +335,20 @@ export async function officePages(extension, bytes, requestPassword, reportPrint
     return [officePage(kind, sheet, contents)];
   }
   if (kind === "sheet") {
-    const pages = Array.from(markup.querySelectorAll(".odr-sheet"), (node, index) => {
+    const visible = visibleOfficeSheets(type, metadata, views);
+    const sheets = [...markup.querySelectorAll(".odr-sheet")];
+    if (visible && (visible.length !== sheets.length ||
+        sheets.some((node, index) => node.getAttribute("data-odr-sheet") !== String(index)))) {
+      throw new Error("시트 표시 상태를 확인할 수 없어요.");
+    }
+    const pages = sheets.flatMap((node, index) => {
+      if (visible && !visible[index]) return [];
       const width = parseFloat(node.style.getPropertyValue("--odr-sheet-width"));
       const gutter = parseFloat(node.style.getPropertyValue("--odr-sheet-gutter"));
       if (width > gutter && gutter >= 0) {
         node.style.setProperty("--office-print-scale", String(Math.min(1, sheetPrintWidth / (width - gutter))));
       }
-      return officePage(kind, sheet, [node], views[index]);
+      return [officePage(kind, sheet, [node], views[index])];
     });
     if (!pages.length) throw new Error("표시할 페이지가 없어요.");
     const style = document.createElement("style");
@@ -269,10 +358,7 @@ export async function officePages(extension, bytes, requestPassword, reportPrint
     return pages;
   }
   const slides = markup.querySelectorAll(".odr-pages > .odr-page-outer");
-  const printStyle = document.createElement("style");
-  printStyle.media = "print";
-  printStyle.textContent = "@page { margin: 0; }";
-  document.head.append(printStyle);
+  useSlidePrintMargin();
   const sizes = new Map();
   let reportedPrintSize = false;
   globalThis.fitOfficeSlides = (width, height) => {

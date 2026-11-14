@@ -1,4 +1,5 @@
 import { viewerText } from './viewer-strings.js';
+import { officeFormats } from './office-formats.js';
 
 const maxSheetRows = 1000;
 const maxSheetColumns = 64;
@@ -429,10 +430,10 @@ function appendTable(page, rows, truncated) {
   if (truncated) page.append(element("p", "other-note", viewerText("tablePreview", "미리보기에 표의 일부만 표시돼요.")));
 }
 
-async function commaSeparated(bytes) {
-  const csv = await loadScript("papaparse-5.7.1.js", "Papa");
+async function delimitedTable(bytes, delimiter) {
+  const parser = await loadScript("papaparse-5.7.1.js", "Papa");
   const page = element("section", "other-document-page other-sheet");
-  const { data, meta } = csv.parse(decodeText(bytes), { preview: maxSheetRows });
+  const { data, meta } = parser.parse(decodeText(bytes), { preview: maxSheetRows, delimiter });
   page.toggleAttribute("data-partial-preview", meta.truncated || data.some(row => row.length > maxSheetColumns));
   appendTable(page, data.map(row => row.slice(0, maxSheetColumns)), page.hasAttribute("data-partial-preview"));
   return [page];
@@ -442,21 +443,17 @@ export async function openOther(extension, bytes, viewer, reportPage, requestPas
   if (extension === "pdf") return pdfDocument(bytes, viewer, reportPage, requestPassword);
   let pages;
   let occurrenceSearch;
-  switch (extension) {
-    case "doc":
-    case "docx":
-    case "xls":
-    case "xlsx":
-    case "ppt":
-    case "pptx": {
-      const { officePages, docxSearch } = await import("./office-viewer.js");
-      pages = await officePages(extension, bytes, requestPassword, reportPrintSize);
-      if (extension === "docx") occurrenceSearch = docxSearch(pages[0]);
-      break;
+  if (officeFormats.has(extension)) {
+    const { officePages, docxSearch } = await import("./office-viewer.js");
+    pages = await officePages(extension, bytes, requestPassword, reportPrintSize);
+    if (extension === "docx") occurrenceSearch = docxSearch(pages[0]);
+  } else {
+    switch (extension) {
+      case "tsv":
+      case "csv": pages = await delimitedTable(bytes, extension === "tsv" ? "\t" : undefined); break;
+      case "txt": pages = [element("pre", "other-document-page other-text", decodeText(bytes))]; break;
+      default: throw new Error("이 파일 형식을 표시할 수 없어요.");
     }
-    case "csv": pages = await commaSeparated(bytes); break;
-    case "txt": pages = [element("pre", "other-document-page other-text", decodeText(bytes))]; break;
-    default: throw new Error("이 파일 형식을 표시할 수 없어요.");
   }
   viewer.replaceChildren(...pages);
   const navigation = pagination(pages, reportPage, index => {

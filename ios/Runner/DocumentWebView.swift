@@ -68,7 +68,7 @@ private final class ViewerResources: NSObject, WKURLSchemeHandler {
             "Content-Length": String(data.count),
             "Cache-Control": "no-store",
           ]
-          if ["office-worker.js", "pdf.worker.min.mjs"].contains(url.lastPathComponent) {
+          if ["office-worker.js", "pptx-worker.js", "pdf.worker.min.mjs"].contains(url.lastPathComponent) {
             headers["Content-Security-Policy"] = workerContentPolicy
           }
           let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!
@@ -160,7 +160,13 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   private var exportDirectory: URL?
 
   private var isHwp: Bool { fileExtension == "hwp" || fileExtension == "hwpx" }
-  private var isSlide: Bool { fileExtension == "ppt" || fileExtension == "pptx" }
+  private static let slideFormats: Set<String> = ["ppt", "pptx", "ppsx", "potx", "odp"]
+  private static let printableFormats = slideFormats.union([
+    "txt", "csv", "tsv", "md", "svg",
+    "doc", "docx", "dotx", "docm", "odt", "rtf",
+    "xls", "xlsx", "xltx", "xlsm", "ods",
+  ])
+  private var isSlide: Bool { Self.slideFormats.contains(fileExtension) }
 
   init(frame: CGRect, file: URL?, assets: URL?, document: [String: String], channel: FlutterMethodChannel) {
     self.channel = channel
@@ -315,7 +321,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   }
 
   private func beginPrint(_ result: @escaping FlutterResult) {
-    let printable = isHwp ? canPrintHwp : ["txt", "csv", "doc", "docx", "ppt", "pptx", "xls", "xlsx"].contains(fileExtension)
+    let printable = isHwp ? canPrintHwp : Self.printableFormats.contains(fileExtension)
     guard pageCount > 0, printable else {
       result(FlutterError(code: "print", message: "이 문서는 PDF로 저장할 수 없습니다.", details: nil))
       return

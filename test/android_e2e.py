@@ -266,13 +266,20 @@ def export_pdf(device, filename, *, direct=False, local_copy=None):
     ))
     deadline = time.monotonic() + 90
     while time.monotonic() < deadline:
-        # The picker can create a zero-byte destination before writing the PDF.
+        # Files exposes the destination while the print spooler is still writing.
         result = device.adb("shell", "find", "/sdcard/Download", "-maxdepth", "3",
                             "-name", filename + ".pdf", "-size", "+0c", check=False)
         if result.strip():
             path = result.strip()
             header = device.adb("exec-out", "head", "-c", "8", path)
             assert header.startswith("%PDF-"), header
+            tail = subprocess.check_output(
+                ["adb", "-s", device.serial, "exec-out", "tail", "-c", "64", path],
+                timeout=16,
+            )
+            if not tail.rstrip().endswith(b"%%EOF"):
+                time.sleep(0.5)
+                continue
             if local_copy is not None:
                 device.adb("pull", path, str(local_copy))
             device.shell("rm", path)
@@ -286,6 +293,8 @@ def run(device):
     check_resolver(device, "application/octet-stream", base + "primary%3ADownload%2Fsample.hwp")
     check_resolver(device, "application/octet-stream", base + "123")
     check_resolver(device, "application/csv", base + "123")
+    check_resolver(device, "text/tab-separated-values", base + "123")
+    check_resolver(device, "application/vnd.openxmlformats-officedocument.presentationml.slideshow", base + "123")
     check_resolver(device, "application/x-hwp", base + "123", browsable=True)
     legacy = f"file://{REMOTE}/many.hwp"
     check_resolver(device, "application/x-hwp", legacy, browsable=True)
@@ -313,10 +322,13 @@ def run(device):
         ("word.docx", "Document"),
         ("office-sheets.xls", "1 / 2"),
         ("office-sheets.xlsx", "1 / 2"),
+        ("hidden-sheet.xlsx", "Office sheet one"),
         ("office-slides.ppt", "1 / 2"),
         ("office-slides.pptx", "1 / 2"),
+        ("complex-slides.pptx", "1 / 4"),
         ("test.txt", "1 / 1"),
         ("test.csv", "1 / 1"),
+        ("test.tsv", "1 / 1"),
         ("long.txt", "1 / 2"),
         ("long.csv", "1 / 4"),
     ):
@@ -349,6 +361,13 @@ def run(device):
         if name == "test.csv":
             export_pdf(device, "kkomi-e2e-export", direct=True)
             device.has("test.csv")
+        if name == "test.tsv":
+            with tempfile.TemporaryDirectory() as directory:
+                pdf = Path(directory) / "table.pdf"
+                export_pdf(device, "kkomi-e2e-tsv-export", direct=True, local_copy=pdf)
+                table = subprocess.check_output(["pdftotext", "-layout", str(pdf), "-"], encoding="utf-8")
+                assert "Seoul, Korea" in table and "0012" in table and "Second line" in table, table
+            device.has("test.tsv")
         if name == "many.hwp":
             device.tap("다음 페이지")
             device.has("2 / 11")
@@ -372,6 +391,22 @@ def run(device):
             device.tap("문서 메뉴")
             export_pdf(device, "kkomi-e2e-sheets-export")
             device.has("1 / 2")
+        if name == "hidden-sheet.xlsx":
+            device.tap("검색")
+            device.wait(lambda node: node.get("class") == "android.widget.EditText" and
+                        node.get("focused") == "true", "sheet search field")
+            device.text("two")
+            device.has("two")
+            device.back()
+            device.has("검색 결과가 없어요")
+            device.tap("검색 닫기")
+            device.tap("문서 메뉴")
+            with tempfile.TemporaryDirectory() as directory:
+                pdf = Path(directory) / "hidden-sheet.pdf"
+                export_pdf(device, "kkomi-e2e-hidden-sheet", local_copy=pdf)
+                text = subprocess.check_output(["pdftotext", str(pdf), "-"], encoding="utf-8")
+                words = " ".join(text.split())
+                assert "Office sheet one" in words and "Office sheet two" not in words, text
         if name == "office-slides.pptx":
             device.tap("문서 메뉴")
             with tempfile.TemporaryDirectory() as directory:
@@ -382,6 +417,20 @@ def run(device):
                 assert len(pages) == 2, len(pages)
                 assert "Office slide one" in pages[0] and "Office slide two" in pages[1], text
             device.has("1 / 2")
+        if name == "complex-slides.pptx":
+            device.tap("문서 메뉴")
+            with tempfile.TemporaryDirectory() as directory:
+                pdf = Path(directory) / "complex-slides.pdf"
+                export_pdf(device, "kkomi-e2e-complex-slides", local_copy=pdf)
+                text = subprocess.check_output(["pdftotext", str(pdf), "-"], encoding="utf-8")
+                pages = text.removesuffix("\f").split("\f")
+                assert len(pages) == 4 and "Quarterly results" in " ".join(pages[2].split()), text
+                images = subprocess.check_output(["pdfimages", "-list", str(pdf)], encoding="utf-8")
+                photo_pages = {
+                    int(page) for page in re.findall(r"^\s*(\d+)\s+\d+\s+image\s+1200\s+760\b", images, re.M)
+                }
+                assert photo_pages == {1, 4}, images
+            device.has("1 / 4")
         if name in ("long.txt", "long.csv"):
             device.tap("검색")
             device.text("TXTEndMarker" if name == "long.txt" else "CSVEndMarker")

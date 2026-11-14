@@ -30,14 +30,34 @@ class Document {
     'webp',
     'bmp',
     'avif',
+    'svg',
     'heic',
     'heif',
     'tif',
     'tiff',
   }.contains(extension);
 
-  bool get isOffice =>
-      const {'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}.contains(extension);
+  bool get isOffice => const {
+    'doc',
+    'docx',
+    'dotx',
+    'docm',
+    'odt',
+    'rtf',
+    'xls',
+    'xlsx',
+    'xltx',
+    'xlsm',
+    'ods',
+    'ppt',
+    'pptx',
+    'ppsx',
+    'potx',
+    'odp',
+  }.contains(extension);
+
+  bool get canExportPdf =>
+      isOffice || const {'txt', 'csv', 'tsv', 'md', 'svg'}.contains(extension);
 
   Map<String, String> toMap() => {
     'uri': uri,

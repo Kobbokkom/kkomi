@@ -68,6 +68,10 @@
       body { background: white; }
       #viewer, .other-document-page { padding: 0; margin: 0; box-shadow: none; }
       .office-slide { width: 100%; }
+      #viewer.svg-viewer { display: block; min-height: 0; }
+      .svg-viewer img, .svg-viewer.image-original img {
+        margin: 0 auto; max-width: 100%; max-height: calc(100vh - 1px); break-inside: avoid;
+      }
       .hwp-print-ready #viewer { display: none; }
       .hwp-print-ready .hwp-print-document { display: block; page: kkomi-hwp; }
       .hwp-print-document > img {

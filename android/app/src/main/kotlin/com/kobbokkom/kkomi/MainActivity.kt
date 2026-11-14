@@ -29,12 +29,24 @@ private val documentTypes = mapOf(
     "pdf" to "application/pdf",
     "doc" to "application/msword",
     "docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "dotx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    "docm" to "application/vnd.ms-word.document.macroenabled.12",
+    "odt" to "application/vnd.oasis.opendocument.text",
+    "rtf" to "text/rtf",
     "xls" to "application/vnd.ms-excel",
     "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xltx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+    "xlsm" to "application/vnd.ms-excel.sheet.macroenabled.12",
+    "ods" to "application/vnd.oasis.opendocument.spreadsheet",
     "ppt" to "application/vnd.ms-powerpoint",
     "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "ppsx" to "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+    "potx" to "application/vnd.openxmlformats-officedocument.presentationml.template",
+    "odp" to "application/vnd.oasis.opendocument.presentation",
     "txt" to "text/plain",
     "csv" to "text/csv",
+    "tsv" to "text/tab-separated-values",
+    "md" to "text/markdown",
     "jpg" to "image/jpeg",
     "jpeg" to "image/jpeg",
     "png" to "image/png",
@@ -42,9 +54,12 @@ private val documentTypes = mapOf(
     "webp" to "image/webp",
     "bmp" to "image/bmp",
     "avif" to "image/avif",
+    "svg" to "image/svg+xml",
 )
 private val documentTypeAliases = mapOf(
     "application/csv" to "csv",
+    "application/rtf" to "rtf",
+    "text/x-markdown" to "md",
     "application/haansofthwp" to "hwp",
     "application/vnd.hancom.hwp" to "hwp",
     "application/x-hwp" to "hwp",
@@ -107,7 +122,7 @@ class MainActivity : FlutterActivity() {
                         val uri = call.argument<String>("uri")?.let(Uri::parse)
                         val extension = call.argument<String>("extension")
                         val name = call.argument<String>("name")
-                        if (uri?.scheme != "content" || extension !in setOf("txt", "csv") || name == null) {
+                        if (uri?.scheme != "content" || extension !in setOf("txt", "csv", "tsv") || name == null) {
                             result.error("conversion", "변환에 필요한 문서 정보가 없습니다.", null)
                         } else {
                             conversions.execute {
@@ -374,7 +389,8 @@ class MainActivity : FlutterActivity() {
                 name to size
             }
         } ?: (null to null)
-        val type = contentResolver.getType(uri)?.takeUnless { it == "application/octet-stream" } ?: mime
+        val type = contentResolver.getType(uri)?.lowercase()
+            ?.takeUnless { it == "application/octet-stream" } ?: mime?.lowercase()
         val extension = (name ?: uri.lastPathSegment)?.substringAfterLast('.', "")?.lowercase()
             ?.takeIf(documentTypes::containsKey)
             ?: documentTypeAliases[type]

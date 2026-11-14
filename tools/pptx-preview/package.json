@@ -1,0 +1,12 @@
+{
+  "name": "kkomi-pptx-preview",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@office-kit/pptx": "0.28.0",
+    "@office-kit/pptx-preview": "0.21.0"
+  },
+  "overrides": {
+    "fflate": "0.8.3"
+  }
+}

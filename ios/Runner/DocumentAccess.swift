@@ -11,7 +11,11 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "avif", "heic", "heif", "tif", "tiff",
   ]
   private static let extensions = imageExtensions.union([
-    "hwp", "hwpx", "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv",
+    "hwp", "hwpx", "pdf",
+    "doc", "docx", "dotx", "docm", "odt", "rtf",
+    "xls", "xlsx", "xltx", "xlsm", "ods",
+    "ppt", "pptx", "ppsx", "potx", "odp",
+    "txt", "csv", "tsv", "md", "svg",
   ])
   private static let maxBytes = 64 * 1024 * 1024
   private static let importScheme = "kkomi-import"

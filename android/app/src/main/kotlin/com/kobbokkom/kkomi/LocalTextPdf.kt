@@ -35,7 +35,12 @@ private const val MAX_FIELD_LENGTH = 65536
 private const val MAX_CSV_FIELDS = 256
 
 internal fun convertTextPdf(context: Context, uri: Uri, extension: String, name: String): File {
-    require(extension == "txt" || extension == "csv")
+    val delimiter = when (extension) {
+        "txt" -> null
+        "csv" -> ','
+        "tsv" -> '\t'
+        else -> throw IllegalArgumentException("Unsupported text format")
+    }
     // Validate and replay the same bytes when the provider serves a live or remote stream.
     val source = File.createTempFile("kkomi-text-input-", ".tmp", context.cacheDir)
     try {
@@ -48,12 +53,12 @@ internal fun convertTextPdf(context: Context, uri: Uri, extension: String, name:
         if (!directory.mkdirs() && !directory.isDirectory) throw IOException("Cannot create PDF cache")
         val output = File.createTempFile("kkomi-text-", ".pdf", directory)
         try {
-            val width = if (extension == "csv") A4_HEIGHT else A4_WIDTH
-            val height = if (extension == "csv") A4_WIDTH else A4_HEIGHT
-            val margin = if (extension == "csv") CSV_PAGE_MARGIN else TXT_PAGE_MARGIN
+            val width = if (delimiter != null) A4_HEIGHT else A4_WIDTH
+            val height = if (delimiter != null) A4_WIDTH else A4_HEIGHT
+            val margin = if (delimiter != null) CSV_PAGE_MARGIN else TXT_PAGE_MARGIN
             TextPdf(width, height, margin).use { pdf ->
                 val openSource = { openText(source, encoding) }
-                if (extension == "csv") pdf.writeCsv(openSource, name) else openSource().use(pdf::writeText)
+                if (delimiter != null) pdf.writeTable(openSource, name, delimiter) else openSource().use(pdf::writeText)
                 BoundedOutput(output.outputStream().buffered()).use(pdf.document::writeTo)
             }
             return output
@@ -196,9 +201,9 @@ private class TextPdf(private val width: Int, private val height: Int, private v
         finishPage()
     }
 
-    fun writeCsv(openSource: () -> BufferedReader, name: String) {
+    fun writeTable(openSource: () -> BufferedReader, name: String, delimiter: Char) {
         val columnCount = openSource().use { source ->
-            val rows = CsvRows(source)
+            val rows = DelimitedRows(source, delimiter)
             var maxColumns = 0
             while (true) maxColumns = maxOf(maxColumns, rows.next()?.size ?: break)
             maxColumns
@@ -213,7 +218,7 @@ private class TextPdf(private val width: Int, private val height: Int, private v
         // Replay wide tables one column band at a time so each band flows across pages.
         for (from in 0 until columnCount step CSV_COLUMNS_PER_BAND) {
             openSource().use { source ->
-                val rows = CsvRows(source)
+                val rows = DelimitedRows(source, delimiter)
                 val count = minOf(columnCount - from, CSV_COLUMNS_PER_BAND)
                 fun cells(row: List<String>) = List(count) { row.getOrElse(from + it) { "" } }
                 val names = cells(rows.next().orEmpty())
@@ -301,7 +306,7 @@ private fun StringBuilder.appendFieldChar(value: Char) {
     append(value)
 }
 
-private class CsvRows(reader: BufferedReader) {
+private class DelimitedRows(reader: BufferedReader, private val delimiter: Char) {
     private val source = PushbackReader(reader)
 
     fun next(): List<String>? {
@@ -313,7 +318,7 @@ private class CsvRows(reader: BufferedReader) {
             val code = source.read()
             when {
                 code == -1 -> {
-                    if (quoted) throw IOException("Unclosed CSV quote")
+                    if (quoted) throw IOException("Unclosed table field quote")
                     if (!seen) return null
                     break
                 }
@@ -328,8 +333,8 @@ private class CsvRows(reader: BufferedReader) {
                 }
                 quoted -> field.appendFieldChar(code.toChar())
                 code == '"'.code && field.isEmpty() -> quoted = true
-                code == ','.code -> {
-                    if (values.size == MAX_CSV_FIELDS - 1) throw IOException("CSV has too many columns")
+                code == delimiter.code -> {
+                    if (values.size == MAX_CSV_FIELDS - 1) throw IOException("Table has too many columns")
                     values.add(field.toString())
                     field.setLength(0)
                 }

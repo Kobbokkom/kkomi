@@ -10,17 +10,20 @@ let opening = false;
 let passwordReply;
 let printRequest = 0;
 
-const imageTypes = new Map([
+const rasterTypes = new Map([
   ['jpg', 'image/jpeg'], ['jpeg', 'image/jpeg'], ['png', 'image/png'],
   ['gif', 'image/gif'], ['webp', 'image/webp'], ['bmp', 'image/bmp'],
   ['avif', 'image/avif'], ['heic', 'image/heic'], ['heif', 'image/heif'],
   ['tif', 'image/tiff'], ['tiff', 'image/tiff'],
 ]);
-const rasterTypes = new Set(imageTypes.values());
+const imageTypes = new Map([...rasterTypes, ['svg', 'image/svg+xml']]);
+const rasterMimeTypes = new Set(rasterTypes.values());
 
 async function openImage(bytes, contentType, extension) {
   const reportedType = contentType?.split(';')[0].trim().toLowerCase();
-  const type = rasterTypes.has(reportedType) ? reportedType : imageTypes.get(extension);
+  const isSvg = extension === 'svg';
+  // An SVG loaded as an image cannot execute scripts or load external files.
+  const type = !isSvg && rasterMimeTypes.has(reportedType) ? reportedType : imageTypes.get(extension);
   const source = URL.createObjectURL(new Blob([bytes], { type }));
   const image = new Image();
   image.alt = viewerText('image', '이미지');
@@ -34,6 +37,7 @@ async function openImage(bytes, contentType, extension) {
   }
   window.addEventListener('pagehide', () => URL.revokeObjectURL(source), { once: true });
   viewer.classList.add('image-viewer');
+  if (isSvg) viewer.classList.add('svg-viewer');
   viewer.replaceChildren(image);
   report('ready', 1);
 }

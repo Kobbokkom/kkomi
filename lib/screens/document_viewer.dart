@@ -521,11 +521,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
         (widget.convertedPdf != null ||
             (widget.document.isHwp && _hwpCanPrint));
     final canSave =
-        ready &&
-        !_preparingPdf &&
-        (directSave ||
-            widget.document.isOffice ||
-            const {'txt', 'csv'}.contains(widget.document.extension));
+        ready && !_preparingPdf && (directSave || widget.document.canExportPdf);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: _isPdf ? Colors.white : null,

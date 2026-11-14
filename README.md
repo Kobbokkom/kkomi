@@ -4,8 +4,11 @@
 
 - **HWP/HWPX** · rhwp WebView로 오프라인 열람, 암호 입력, 텍스트 선택, 검색 결과 강조, 페이지 이동과 확대, PDF 저장. 배포용 HWP는 문서에 설정된 복사·인쇄 제한을 따릅니다.
 - **PDF** · 암호 입력, 선택 가능한 텍스트, 하단 페이지 이동과 검색 결과 강조
-- **DOC/DOCX/XLS/XLSX/PPT/PPTX** · OpenDocument Reader로 오프라인 열람, 검색, PDF 저장. Word는 화면 너비에 맞춰 문단을 재배치하고, 스프레드시트는 시트별로 일부 범위를 표시합니다.
-- **TXT/CSV** · 오프라인 열람, 검색과 PDF 저장
+- **DOC/DOCX/DOTX/DOCM/ODT/RTF** · 오프라인 열람, 검색, PDF 저장. Word 계열 문서는 화면 너비에 맞춰 재배치합니다. RTF는 본문 미리보기를 제공합니다.
+- **XLS/XLSX/XLTX/XLSM/ODS** · 시트별 오프라인 열람, 검색, PDF 저장. 스프레드시트는 시트별로 일부 범위를 표시합니다.
+- **PPT/PPTX/PPSX/POTX/ODP** · 슬라이드별 오프라인 열람, 검색, PDF 저장
+- **TXT/CSV/TSV/Markdown** · 오프라인 열람, 검색과 PDF 저장
+- **이미지** · SVG 미리보기와 PDF 저장 지원
 
 홈에서 주간 열람, 전체 문서 페이지 수, 연속 사용, 최근 문서(최대 10개)와 상식 카드를 확인할 수 있습니다. 같은 앱으로 업데이트할 때는 기존 홈 통계, 시스템 뷰어 선호, 접근 가능한 최근 문서 기록을 이어받습니다.
 
@@ -27,7 +30,7 @@ python3 test/android_e2e.py --serial emulator-5562
 python3 test/android_migration_e2e.py --serial emulator-5562
 ```
 
-Office 파일은 앱에 포함된 OpenDocument Reader 엔진이 기기에서 엽니다. PDF 저장은 이 렌더링 결과를 인쇄합니다.
+PPTX·PPSX·POTX는 Office Kit로 표시합니다. 암호화된 프레젠테이션과 다른 Office 파일은 OpenDocument Reader를 사용합니다. DOCM·XLSM의 매크로는 실행하지 않습니다. PDF 저장은 기기에서 렌더링한 결과를 인쇄합니다.
 
 디버그 APK는 `com.kobbokkom.kkomi.preview`로 설치되어 Play 설치본과 함께 사용할 수 있습니다. 하단 배너에는 AdMob 테스트 광고를 사용합니다.
 

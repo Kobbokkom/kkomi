@@ -236,7 +236,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       if (_preferSystem &&
           !document.isHwp &&
           !document.isOffice &&
-          !document.isImage) {
+          !document.isImage &&
+          !const {'tsv', 'md'}.contains(document.extension)) {
         try {
           await documentsChannel.invokeMethod<void>(
             'openExternal',
@@ -250,14 +251,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       if (Platform.isAndroid &&
-          (document.extension == 'txt' || document.extension == 'csv')) {
+          const {'txt', 'csv', 'tsv'}.contains(document.extension)) {
         try {
           convertedPdf = await documentsChannel.invokeMethod<String>(
             'convertLocalText',
             document.toMap(),
           );
         } on PlatformException {
-          // The WebView still supports text and CSV that cannot be paginated.
+          // The WebView can preview text and tables that cannot be paginated.
         }
       }
       if (!mounted || _pending != null) return;

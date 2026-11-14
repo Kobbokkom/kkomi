@@ -1,10 +1,16 @@
 import { Odr } from "./vendor/odr-7.7.0.mjs";
+import { officeFormats } from "./office-formats.js";
 
 const maxOfficeBytes = 64 * 1024 * 1024;
 const maxMarkupLength = 32 * 1024 * 1024;
 const maxViews = 500;
 
-async function boundedZip(bytes) {
+function sheetMetadata(files, type) {
+  if (type === "xlsx") return [files["xl/workbook.xml"]];
+  if (type === "ods") return [files["content.xml"], files["styles.xml"]];
+}
+
+async function boundedZip(bytes, type) {
   const { unzipSync, zipSync } = await import("./vendor/fflate-0.8.3.mjs");
   let expanded = 0;
   const names = new Set();
@@ -20,7 +26,7 @@ async function boundedZip(bytes) {
     names.add(name);
     return !name.endsWith("/");
   } });
-  return zipSync(files, { level: 0 });
+  return { data: zipSync(files, { level: 0 }), metadata: sheetMetadata(files, type) };
 }
 
 let passwordReply;
@@ -41,10 +47,12 @@ self.onmessage = async ({ data: { extension, bytes, password } }) => {
   }
   let doc;
   try {
+    const format = officeFormats.get(extension);
+    if (!format) throw new Error("이 파일 형식을 표시할 수 없어요.");
     const odr = await Odr.load();
-    const format = odr.enums.FileType[extension];
     const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
-    doc = odr.open(isZip ? await boundedZip(bytes) : bytes, {
+    const archive = isZip ? await boundedZip(bytes, format.type) : { data: bytes };
+    doc = odr.open(archive.data, {
       name: "document." + extension,
       allowExternalContent: false,
       editable: false,
@@ -56,6 +64,9 @@ self.onmessage = async ({ data: { extension, bytes, password } }) => {
       textDocumentMargin: extension === "doc",
       viewportMode: odr.enums.HtmlViewportMode.none,
     });
+    const encrypted = doc.isPasswordEncrypted();
+    // This engine cannot expose original sheet visibility after unlocking ODS.
+    if (format.type === "ods" && encrypted) throw new Error("시트 표시 상태를 확인할 수 없어요.");
     let incorrect = false;
     while (doc.isPasswordEncrypted()) {
       const password = await requestPassword(incorrect);
@@ -70,12 +81,20 @@ self.onmessage = async ({ data: { extension, bytes, password } }) => {
         incorrect = true;
       }
     }
-    if (doc.fileType !== format) throw new Error("문서 형식과 확장자가 일치하지 않아요.");
+    if (doc.fileType !== odr.enums.FileType[format.type]) {
+      throw new Error("문서 형식과 확장자가 일치하지 않아요.");
+    }
     const views = doc.listViews().slice(1);
     if (views.length > maxViews) throw new Error("페이지가 너무 많아 문서를 표시할 수 없어요.");
     const { html } = doc.render();
     if (html.length > maxMarkupLength) throw new Error("문서가 너무 커서 표시할 수 없어요.");
-    self.postMessage({ html, views });
+    let metadata = archive.metadata;
+    if (format.type === "xlsx" && encrypted) {
+      const { unzipSync } = await import("./vendor/fflate-0.8.3.mjs");
+      const files = unzipSync(doc.save(), { filter: part => part.name === "xl/workbook.xml" });
+      metadata = sheetMetadata(files, format.type);
+    }
+    self.postMessage({ html, views, metadata });
   } catch (error) {
     self.postMessage({ error: error.name ?? "Error", message: error.message ?? "" });
   } finally {

@@ -34,6 +34,12 @@ import java.io.InputStream
 
 private const val ORIGIN = "https://appassets.androidplatform.net"
 private const val VIEWER_URL = "$ORIGIN/assets/viewer.html"
+private val slideFormats = setOf("ppt", "pptx", "ppsx", "potx", "odp")
+private val printableFormats = slideFormats + setOf(
+    "txt", "csv", "tsv", "md", "svg",
+    "doc", "docx", "dotx", "docm", "odt", "rtf",
+    "xls", "xlsx", "xltx", "xlsm", "ods",
+)
 
 internal class DocumentWebViewFactory(private val messenger: BinaryMessenger) :
     PlatformViewFactory(StandardMessageCodec.INSTANCE) {
@@ -82,7 +88,13 @@ private class DocumentWebView(
                     "wasm" -> "application/wasm"
                     else -> "application/octet-stream"
                 }
-                WebResourceResponse(mime, null, context.assets.open(lookup))
+                WebResourceResponse(mime, null, context.assets.open(lookup)).apply {
+                    if (path == "js/pptx-worker.js") {
+                        responseHeaders = mapOf(
+                            "Content-Security-Policy" to "default-src 'none'; script-src 'self'; connect-src 'none'",
+                        )
+                    }
+                }
             } catch (_: IOException) {
                 emptyResponse(404, "Not found")
             }
@@ -177,7 +189,7 @@ private class DocumentWebView(
                         val dimensions = data.optJSONObject("value")
                         val width = dimensions?.optInt("width") ?: 0
                         val height = dimensions?.optInt("height") ?: 0
-                        if (extension in setOf("ppt", "pptx") && width in 1000..40000 && height in 1000..40000) {
+                        if (extension in slideFormats && width in 1000..40000 && height in 1000..40000) {
                             val label = labels?.optString("slideSize", "슬라이드 크기") ?: "슬라이드 크기"
                             slideMedia = PrintAttributes.MediaSize("kkomi-slide", label, width, height)
                         }
@@ -245,8 +257,8 @@ private class DocumentWebView(
                             webView.evaluateJavascript("window.prepareHwpPrint()", null)
                         }
                         return@setMethodCallHandler
-                    } else if (extension in setOf("txt", "csv", "doc", "docx", "ppt", "pptx", "xls", "xlsx")) {
-                        val isSlide = extension in setOf("ppt", "pptx")
+                    } else if (extension in printableFormats) {
+                        val isSlide = extension in slideFormats
                         val paper = if (isSlide) {
                             slideMedia ?: PrintAttributes.MediaSize.ISO_A4.asLandscape()
                         } else {
