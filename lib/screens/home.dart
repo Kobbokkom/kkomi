@@ -597,8 +597,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                     leading: const _Illustration('open_file'),
                     title: const Text('파일 열기', style: sectionTitle),
                     subtitle: const Text(
-                      'HWP · HWPX · PDF · Office · CSV · TXT · 이미지',
-                      style: TextStyle(fontSize: 12, color: _muted),
+                      'HWP · PDF · Office · CSV · TXT · 이미지',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, color: _muted),
                     ),
                     trailing: const Icon(
                       Icons.chevron_right,
