@@ -67,7 +67,10 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
 
     try {
         // shortcut: cap placeholder count on phones, virtualize the page list if larger files are needed.
-        if (pageCount < 1 || pageCount > 2000) throw new Error('지원하는 문서 분량은 1~2,000쪽입니다.');
+        if (pageCount < 1) throw new Error('쪽을 찾을 수 없습니다.');
+        if (pageCount > 2000) {
+            throw new Error('Too many HWP pages', { cause: 'hwpPageLimit' });
+        }
         for (let index = 0; index < pageCount; index++) {
             const { width, height } = JSON.parse(doc.getPageInfo(index));
             if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -211,6 +214,29 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
         if (layer.childElementCount) pages[index].append(layer);
     }
 
+    async function rasterPrintPage(svg, index) {
+        const source = URL.createObjectURL(svg);
+        const image = pageImage(index, source);
+        const canvas = document.createElement('canvas');
+        try {
+            await image.decode();
+            const { width, height } = sizes[index];
+            const scale = Math.min(2.5, 4096 / Math.max(width, height), Math.sqrt(8e6 / width / height));
+            canvas.width = Math.max(1, Math.floor(width * scale));
+            canvas.height = Math.max(1, Math.floor(height * scale));
+            const context = canvas.getContext('2d', { alpha: false });
+            context.fillStyle = '#fff';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const raster = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            if (!raster) throw new Error('Cannot encode print page');
+            return raster;
+        } finally {
+            canvas.width = canvas.height = 0;
+            URL.revokeObjectURL(source);
+        }
+    }
+
     async function preparePrint() {
         if (restrictions & noPrint) throw new Error('이 문서는 PDF로 저장할 수 없습니다.');
         if (disposed) throw new Error('문서가 닫혔습니다.');
@@ -223,7 +249,10 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
         try {
             let bytes = 0;
             for (let index = 0; index < pageCount; index++) {
-                const blob = pageSvg(index);
+                const svg = pageSvg(index);
+                // The PDF may retain selectable text from an SVG image.
+                const blob = (restrictions & noCopy) ? await rasterPrintPage(svg, index) : svg;
+                if (printSession !== session) throw new DOMException('Print cancelled', 'AbortError');
                 bytes += blob.size;
                 if (bytes > maxPrintSvgBytes) throw new Error('PDF로 저장하기에 문서가 너무 큽니다.');
                 const url = URL.createObjectURL(blob);

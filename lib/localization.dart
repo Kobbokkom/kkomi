@@ -69,7 +69,7 @@ String nativeMessage(BuildContext context, String? message, String fallback) {
 
 const _nativeStrings = <String, List<String>>{
   '파일을 열 수 없습니다.': [
-    'Could not open the file.',
+    'Couldn’t open the file.',
     'ファイルを開けません。',
     '无法打开文件。',
     '無法開啟檔案。',
@@ -80,7 +80,7 @@ const _nativeStrings = <String, List<String>>{
     'File tidak dapat dibuka.',
   ],
   '파일 선택기를 열 수 없습니다.': [
-    'Could not open the file picker.',
+    'Couldn’t open the file picker.',
     'ファイル選択画面を開けません。',
     '无法打开文件选择器。',
     '無法開啟檔案選擇器。',
@@ -91,7 +91,7 @@ const _nativeStrings = <String, List<String>>{
     'Pemilih file tidak dapat dibuka.',
   ],
   '사진 선택기를 열 수 없습니다.': [
-    'Could not open the photo picker.',
+    'Couldn’t open the photo picker.',
     '写真選択画面を開けません。',
     '无法打开照片选择器。',
     '無法開啟照片選擇器。',
@@ -113,7 +113,7 @@ const _nativeStrings = <String, List<String>>{
     'Lokasi file ini tidak tersedia.',
   ],
   '지원하지 않는 파일 형식입니다.': [
-    'This file format is unsupported.',
+    'This file format isn’t supported.',
     'このファイル形式には対応していません。',
     '不支持此文件格式。',
     '不支援此檔案格式。',
@@ -135,7 +135,7 @@ const _nativeStrings = <String, List<String>>{
     'Ukuran file maksimal 64 MB.',
   ],
   '파일을 읽을 수 없습니다.': [
-    'Could not read the file.',
+    'Couldn’t read the file.',
     'ファイルを読み込めません。',
     '无法读取文件。',
     '無法讀取檔案。',
@@ -146,7 +146,7 @@ const _nativeStrings = <String, List<String>>{
     'File tidak dapat dibaca.',
   ],
   '문서를 공유할 수 없습니다.': [
-    'Could not share the document.',
+    'Couldn’t share the document.',
     '文書を共有できません。',
     '无法分享文档。',
     '無法分享文件。',
@@ -157,7 +157,7 @@ const _nativeStrings = <String, List<String>>{
     'Dokumen tidak dapat dibagikan.',
   ],
   'PDF를 저장할 수 없습니다.': [
-    'Could not save the PDF.',
+    'Couldn’t save the PDF.',
     'PDFを保存できません。',
     '无法保存 PDF。',
     '無法儲存 PDF。',
@@ -168,7 +168,7 @@ const _nativeStrings = <String, List<String>>{
     'PDF tidak dapat disimpan.',
   ],
   'PDF 저장 위치를 선택할 수 없습니다.': [
-    'Could not select a location for the PDF.',
+    'Couldn’t select a location for the PDF.',
     'PDFの保存先を選べません。',
     '无法选择 PDF 保存位置。',
     '無法選擇 PDF 的儲存位置。',
@@ -190,7 +190,7 @@ const _nativeStrings = <String, List<String>>{
     'Informasi dokumen tidak valid.',
   ],
   '문서를 다른 앱으로 열 수 없습니다.': [
-    'Could not open the document in another app.',
+    'Couldn’t open the document in another app.',
     '別のアプリで文書を開けません。',
     '无法在其他应用中打开文档。',
     '無法在其他 App 中開啟文件。',

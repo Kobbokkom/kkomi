@@ -107,6 +107,18 @@ class Device:
     def launch(self):
         self.shell("am", "start", "-W", "-n", ACTIVITY)
 
+    def use_korean(self):
+        settings = self.wait(
+            lambda node: any(value in ("설정", "Settings") for value in self.labels(node)),
+            "app settings",
+        )
+        if "설정" in self.labels(settings):
+            return
+        self.click(settings)
+        self.tap("System default")
+        self.tap("한국어")
+        self.tap("닫기")
+
     def picker(self):
         self.click(self.scroll_to("파일 열기"))
         self.wait(lambda node: "documentsui" in node.get("package", ""), "Android picker")
@@ -115,7 +127,7 @@ class Device:
         self.tap("설정")
         switch = self.wait(
             lambda node: node.get("checkable") == "true" and any(
-                "시스템 뷰어 선호" in value for value in self.labels(node)),
+                "시스템 뷰어 우선 사용" in value for value in self.labels(node)),
             "system viewer setting",
         )
         if switch.get("checked") == "true":
@@ -276,6 +288,7 @@ def run(device):
     legacy = f"file://{REMOTE}/many.hwp"
     check_resolver(device, "application/x-hwp", legacy, browsable=True)
     device.launch()
+    device.use_korean()
     for label in ("주간 열람", "연속 사용", "이번 주 페이지", "최근 문서", "0 / ∞"):
         device.has(label)
 
@@ -329,7 +342,7 @@ def run(device):
             device.tap("검색")
             device.text("Office%ssheet%sone" if "sheets" in name else "Office%sslide%sone")
             device.back()
-            device.has("검색 결과 1페이지")
+            device.has("검색 결과가 있는 페이지 1개")
             device.tap("검색 닫기")
         if name == "test.csv":
             export_pdf(device, "kkomi-e2e-export", direct=True)
@@ -386,6 +399,16 @@ def run(device):
     device.open("distribution-restricted.hwp", "1 / 1")
     assert all("PDF로 저장" not in value and "꼬미 오프라인 열기" not in value
                for node in device.nodes() for value in device.labels(node))
+    device.back()
+    device.has("최근 문서")
+    device.open("distribution-copy-restricted.hwp", "1 / 1")
+    with tempfile.TemporaryDirectory() as directory:
+        pdf = Path(directory) / "restricted.pdf"
+        export_pdf(device, "kkomi-e2e-copy-restricted", local_copy=pdf)
+        text = subprocess.check_output(["pdftotext", str(pdf), "-"], encoding="utf-8")
+        assert not text.strip(), text
+        images = subprocess.check_output(["pdfimages", "-list", str(pdf)], encoding="utf-8")
+        assert len(images.splitlines()) > 2, images
     device.back()
     device.has("최근 문서")
     device.open("locked.hwp", "문서 암호")

@@ -433,8 +433,8 @@ async function commaSeparated(bytes) {
   const csv = await loadScript("papaparse-5.7.1.js", "Papa");
   const page = element("section", "other-document-page other-sheet");
   const { data, meta } = csv.parse(decodeText(bytes), { preview: maxSheetRows });
-  appendTable(page, data.map(row => row.slice(0, maxSheetColumns)),
-    meta.truncated || data.some(row => row.length > maxSheetColumns));
+  page.toggleAttribute("data-partial-preview", meta.truncated || data.some(row => row.length > maxSheetColumns));
+  appendTable(page, data.map(row => row.slice(0, maxSheetColumns)), page.hasAttribute("data-partial-preview"));
   return [page];
 }
 
@@ -463,5 +463,7 @@ export async function openOther(extension, bytes, viewer, reportPage, requestPas
     const page = pages[index];
     return (page.shadowRoot?.querySelector(".office-content") ?? page).textContent;
   });
-  return Object.assign(navigation, occurrenceSearch);
+  return Object.assign(navigation, occurrenceSearch, {
+    partialPreview: pages.some(page => page.hasAttribute("data-partial-preview")),
+  });
 }

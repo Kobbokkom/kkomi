@@ -41,6 +41,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   bool get _hasDocumentAccess => Platform.isAndroid || Platform.isIOS;
 
   final _history = <Document>[];
+  Set<String>? _savedHistoryUris;
   final _tipIndex = Random().nextInt(1 << 31);
   final _preferences = SharedPreferencesAsync();
   HomeActivity _activity = HomeActivity.decode(null);
@@ -87,10 +88,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             restoreActivity: activityData == null,
           );
           if (legacy.historyRestoreFailed) {
-            _homeMessage('이전 앱의 최근 문서를 불러올 수 없습니다.');
+            _homeMessage('이전 버전의 최근 문서를 불러올 수 없습니다.');
           }
         } on PlatformException {
-          _homeMessage('이전 앱의 기록을 불러올 수 없습니다.');
+          _homeMessage('이전 버전의 기록을 불러올 수 없습니다.');
         }
       }
       if (!mounted) return;
@@ -103,6 +104,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         }
       }
       final migratedHistory = legacy?.history;
+      _savedHistoryUris = history.map((document) => document.uri).toSet();
       if (migratedHistory != null) {
         final knownUris = history.map((document) => document.uri).toSet();
         history.addAll(
@@ -403,6 +405,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Future<void> _forgetIfUnused(Document document) async {
     if (document.uri == _active?.uri ||
         document.uri == _pending?.uri ||
+        _savedHistoryUris?.contains(document.uri) != false ||
         _history.any((entry) => entry.uri == document.uri)) {
       return;
     }
@@ -410,6 +413,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   Future<void> _saveHistory({bool clearLegacyPending = false}) {
+    final uris = _history.map((document) => document.uri).toSet();
     final snapshot = _history
         .map((entry) => jsonEncode(entry.toMap()))
         .toList();
@@ -420,6 +424,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           await _preferences.setBool(_legacyHistoryPendingKey, true);
         }
         await _preferences.setStringList(_preferencesKey, snapshot);
+        _savedHistoryUris = uris;
         if (clearLegacyPending) {
           await _preferences.remove(_legacyHistoryPendingKey);
         }
@@ -483,11 +488,11 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                     ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(t('시스템 뷰어 선호')),
+                    title: Text(t('시스템 뷰어 우선 사용')),
                     subtitle: Text(
                       t(
                         Platform.isIOS
-                            ? 'PDF·Office·텍스트를 가능한 경우 iOS 미리보기로 열기'
+                            ? '가능한 경우 PDF·Office·텍스트 파일을 iOS 훑어보기로 열기'
                             : 'HWP 계열과 사진을 제외한 문서는 가능한 경우 시스템 앱으로 열기',
                       ),
                     ),
@@ -617,7 +622,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    _t('파일 열기로 문서를 추가해보세요'),
+                                    _t('파일을 열면 여기에 표시돼요'),
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       fontSize: 11,
@@ -786,7 +791,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           ),
         ),
         IconButton(
-          tooltip: _t('최근 문서에서 삭제'),
+          tooltip: _t('최근 문서 목록에서 제거'),
           onPressed: () => unawaited(_remove(document)),
           icon: const Icon(Icons.close, size: 16, color: _muted),
         ),

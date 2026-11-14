@@ -1,3 +1,4 @@
+import Darwin
 import Flutter
 import PhotosUI
 import QuickLook
@@ -161,7 +162,8 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
       imports.async {
         let missing = uris.prefix(10).filter { uri in
           guard let url = try? Self.importLocation(uri) else { return true }
-          return !FileManager.default.fileExists(atPath: url.path)
+          var info = stat()
+          return lstat(url.path, &info) == -1 && (errno == ENOENT || errno == ENOTDIR)
         }
         DispatchQueue.main.async { result(Array(missing)) }
       }

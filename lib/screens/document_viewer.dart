@@ -43,6 +43,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
   bool _preparingPdf = false;
   bool _hwpCanPrint = false;
   bool _imageFit = true;
+  bool _partialPreview = false;
   List<_OutlineItem> _outline = const [];
 
   bool get _isPdf =>
@@ -50,6 +51,16 @@ class _DocumentViewerState extends State<DocumentViewer> {
   bool get _hasPageToolbar => _isPdf || widget.document.isHwp;
   bool get _bottomSearch =>
       _hasPageToolbar || widget.document.extension == 'docx';
+  String get _unfittedImageLabel =>
+      Platform.isIOS &&
+          const {
+            'heic',
+            'heif',
+            'tif',
+            'tiff',
+          }.contains(widget.document.extension)
+      ? '미리보기 크기'
+      : '원본 크기';
 
   String _text(String key) => translate(context, key, viewerStrings);
 
@@ -114,6 +125,8 @@ class _DocumentViewerState extends State<DocumentViewer> {
           unawaited(_promptPassword(call.arguments as bool));
         case 'canPrint':
           setState(() => _hwpCanPrint = call.arguments == true);
+        case 'partialPreview':
+          setState(() => _partialPreview = call.arguments == true);
         case 'error':
           setState(() => _error = call.arguments as String);
         case 'matches':
@@ -588,10 +601,17 @@ class _DocumentViewerState extends State<DocumentViewer> {
                 if (ready && widget.document.isImage)
                   PopupMenuItem(
                     value: 'imageFit',
-                    child: Text(_text(_imageFit ? '원본 크기' : '화면에 맞추기')),
+                    child: Text(
+                      _text(_imageFit ? _unfittedImageLabel : '화면에 맞추기'),
+                    ),
                   ),
                 if (canSave)
-                  PopupMenuItem(value: 'print', child: Text(_text('PDF로 저장'))),
+                  PopupMenuItem(
+                    value: 'print',
+                    child: Text(
+                      _text(_partialPreview ? '미리보기를 PDF로 저장' : 'PDF로 저장'),
+                    ),
+                  ),
                 PopupMenuItem(value: 'share', child: Text(_text('공유'))),
               ],
             ),
@@ -609,7 +629,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
               child: Text(switch (_matches) {
                 0 => _text('검색 결과가 없어요'),
                 _ => _text(
-                  '검색 결과 {count}페이지',
+                  '검색 결과가 있는 페이지 {count}개',
                 ).replaceAll('{count}', '$_matches'),
               }, style: Theme.of(context).textTheme.bodySmall),
             ),

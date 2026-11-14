@@ -160,7 +160,7 @@ private class DocumentWebView(
                         channel.invokeMethod(event, data.optString("value"))
                     }
                     "error" -> channel.invokeMethod(event, data.optString("value"))
-                    "password" -> channel.invokeMethod(event, data.optBoolean("value"))
+                    "password", "partialPreview" -> channel.invokeMethod(event, data.optBoolean("value"))
                     "canPrint" -> {
                         hwpCanPrint = data.optBoolean("value")
                         channel.invokeMethod(event, hwpCanPrint)

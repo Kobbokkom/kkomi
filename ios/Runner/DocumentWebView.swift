@@ -289,7 +289,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
       if isHwp, let outline = value as? String {
         channel.invokeMethod(event, arguments: outline)
       }
-    case "page", "error", "password", "matches":
+    case "page", "error", "password", "matches", "partialPreview":
       channel.invokeMethod(event, arguments: value)
     case "printMedia":
       if isSlide, let size = dimensions(value),

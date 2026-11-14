@@ -91,7 +91,7 @@ def run(device):
     device.tap("설정")
     setting = device.wait(
         lambda node: node.get("checkable") == "true" and
-        any("시스템 뷰어 선호" in label for label in device.labels(node)),
+        any("시스템 뷰어 우선 사용" in label for label in device.labels(node)),
         "system viewer setting",
     )
     assert setting.get("checked") == "false", setting.attrib
@@ -121,8 +121,8 @@ def run(device):
     device.back()
     expect_home(device, "5 / ∞", "24p")
 
-    device.tap("최근 문서에서 삭제")
-    device.tap("최근 문서에서 삭제")
+    device.tap("최근 문서 목록에서 제거")
+    device.tap("최근 문서 목록에서 제거")
     device.has("최근에 연 문서가 없어요")
 
     device.shell("am", "force-stop", device.package)

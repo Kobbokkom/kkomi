@@ -6,4 +6,4 @@ The complex DOCX contains a header, footer, merged table and landscape section. 
 
 `locked-legacy.xls` is a copy of `office-sheets.xls` with a BIFF record marker in a later workbook mini sector replaced by `FILEPASS`. The converter test uses it to verify rejection before HTTP upload.
 
-`distribution-restricted.hwp` uses the synthetic content of `offline.hwp` in a distribution `ViewText` stream. Both copy and printing restriction flags are set.
+The distribution fixtures use the synthetic content of `offline.hwp` in a `ViewText` stream. `distribution-restricted.hwp` restricts both copying and printing, while `distribution-copy-restricted.hwp` allows printing.

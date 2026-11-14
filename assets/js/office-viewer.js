@@ -129,6 +129,7 @@ function officePage(kind, sheet, contents, view, resize) {
   }
   shadow.append(root);
   if (view?.sheetCut) {
+    page.setAttribute("data-partial-preview", "");
     const warning = document.createElement("p");
     warning.className = "office-cut";
     warning.textContent = viewerText("tablePreview", "미리보기에 표의 일부만 표시돼요.");

@@ -18,10 +18,9 @@ const imageTypes = new Map([
 ]);
 const rasterTypes = new Set(imageTypes.values());
 
-async function openImage(response, extension) {
-  const reportedType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+async function openImage(bytes, contentType, extension) {
+  const reportedType = contentType?.split(';')[0].trim().toLowerCase();
   const type = rasterTypes.has(reportedType) ? reportedType : imageTypes.get(extension);
-  const bytes = await response.arrayBuffer();
   const source = URL.createObjectURL(new Blob([bytes], { type }));
   const image = new Image();
   image.alt = viewerText('image', '이미지');
@@ -62,16 +61,26 @@ globalThis.openDocument = async (extension, localizedStrings) => {
   opening = true;
   try {
     setViewerStrings(localizedStrings);
-    const response = await fetch('/document');
-    if (!response.ok) {
+    const reader = new AbortController();
+    const deadline = setTimeout(() => reader.abort(), 30000);
+    let bytes;
+    let contentType;
+    try {
+      const response = await fetch('/document', { signal: reader.signal });
+      if (!response.ok) throw new Error('Cannot read document');
+      contentType = response.headers.get('content-type');
+      bytes = await response.arrayBuffer();
+    } catch {
       report('error', '파일을 읽을 수 없습니다. 다시 선택해 주세요.');
       return;
+    } finally {
+      clearTimeout(deadline);
     }
     if (imageTypes.has(extension)) {
-      await openImage(response, extension);
+      await openImage(bytes, contentType, extension);
       return;
     }
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    bytes = new Uint8Array(bytes);
     const onPage = (page) => report('page', page);
     if (extension === 'hwp' || extension === 'hwpx') {
       const { openHwp } = await import('./hwp-viewer.js');
@@ -82,6 +91,7 @@ globalThis.openDocument = async (extension, localizedStrings) => {
       documentView = await openOther(extension, bytes, viewer, onPage, requestPassword,
         (width, height) => report('printMedia', { width, height }));
     }
+    if (documentView.partialPreview) report('partialPreview', true);
     report('ready', documentView.pageCount);
     if (documentView.readOutline) {
       setTimeout(() => {
@@ -90,8 +100,10 @@ globalThis.openDocument = async (extension, localizedStrings) => {
       }, 0);
     }
   } catch (error) {
-    if (error.name === 'AbortError') return;
-    if (imageTypes.has(extension)) {
+    if (error?.name === 'AbortError' && error.message === 'Password cancelled') return;
+    if (error?.cause === 'hwpPageLimit') {
+      report('error', 'HWP와 HWPX 문서는 2,000쪽까지 열 수 있습니다.');
+    } else if (imageTypes.has(extension)) {
       report('error', '이미지를 열 수 없습니다. 손상되었거나 지원하지 않는 형식일 수 있습니다.');
     } else if (/password|encrypted|암호/i.test(String(error))) {
       report('error', '암호가 설정된 문서입니다. 암호를 해제한 뒤 열어 주세요.');

@@ -14,9 +14,18 @@ def converter_proxy(upstream_port, requests):
             requests.append(self.path)
             length = int(self.headers["Content-Length"])
             assert 0 < length <= 64 * 1024 * 1024
+            source = self.rfile.read(length)
+            if len(requests) == 2:
+                truncated = b"%PDF-1.7\ntruncated dummy\nstartxref\n10\n%%EOF\n"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Length", str(len(truncated)))
+                self.end_headers()
+                self.wfile.write(truncated)
+                return
             upstream = HTTPConnection("127.0.0.1", upstream_port, timeout=100)
             try:
-                upstream.request("POST", self.path, self.rfile.read(length), {
+                upstream.request("POST", self.path, source, {
                     "Content-Type": self.headers["Content-Type"],
                 })
                 response = upstream.getresponse()
@@ -37,6 +46,7 @@ def converter_proxy(upstream_port, requests):
 
 def run(device):
     device.launch()
+    device.use_korean()
     device.use_builtin_viewer()
 
     device.picker()
@@ -59,10 +69,16 @@ def run(device):
     device.has("1 / 3")
     device.back()
     device.has("최근 문서")
-    device.tap("최근 문서에서 삭제")
+    device.tap("최근 문서 목록에서 제거")
 
     device.picker()
     device.select_file("complex.docx")
+    device.has("서버에서 PDF로 변환할까요?")
+    device.tap("서버에서 변환")
+    device.has("FirstPageHeading")
+    device.back()
+    device.has("최근 문서")
+    device.click(device.has("complex.docx"))
     device.has("서버에서 PDF로 변환할까요?")
     device.tap("기기에서 열기")
     device.has("FirstPageHeading")
@@ -101,7 +117,7 @@ def main():
         try:
             device.adb("reverse", port, f"tcp:{proxy.server_port}")
             run(device)
-            assert requests == ["/convert/docx"], requests
+            assert requests == ["/convert/docx"] * 2, requests
             print("PASS only consented, unencrypted Office reached the HTTP endpoint", flush=True)
         finally:
             device.adb("reverse", "--remove", port, check=False)
