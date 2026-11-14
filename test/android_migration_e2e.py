@@ -170,6 +170,7 @@ def main():
     assert device.shell("pm", "clear", device.package).strip() == "Success"
     seed(device)
     device.launch()
+    device.use_korean()
     run(device)
 
 

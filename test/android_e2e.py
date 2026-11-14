@@ -205,9 +205,20 @@ class Device:
         return self.wait(lambda n: n.get("text") == name and
                          n.get("resource-id") == "android:id/title", f"{name} in Android Files")
 
-    def open(self, name, visible):
+    def open(self, name, visible, *, prefer_local=False):
         self.picker()
         self.select_file(name)
+        if prefer_local:
+            choice = self.wait(
+                lambda node: any(
+                    label in value
+                    for value in self.labels(node)
+                    for label in ("기기에서 열기", visible)
+                ),
+                f"{visible} or the local Office option",
+            )
+            if "기기에서 열기" in self.labels(choice):
+                self.click(choice)
         if visible != "문서 암호":
             self.has(name)
         return self.has(visible)
@@ -318,7 +329,7 @@ def run(device):
         ("long.txt", "1 / 2"),
         ("long.csv", "1 / 4"),
     ):
-        device.open(name, marker)
+        device.open(name, marker, prefer_local=name.endswith((".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx")))
         print(f"PASS {name}", flush=True)
         if name == "four-pages.pdf":
             device.tap("검색")
@@ -430,7 +441,7 @@ def run(device):
     device.has("1 / 1")
     device.back()
     device.has("최근 문서")
-    device.open("locked-office.docx", "문서 암호")
+    device.open("locked-office.docx", "문서 암호", prefer_local=True)
     device.text("kkomi-test")
     device.tap("열기")
     device.has("Document")
