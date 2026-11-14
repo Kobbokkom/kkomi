@@ -182,10 +182,6 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
       }
     case "openExternal":
       preview(document?["uri"], result: result)
-    case "officeConverterAvailable":
-      result(false)
-    case "convertLocalText", "cachedOfficePdf", "docxEstimateBytes":
-      result(nil)
     default:
       result(FlutterMethodNotImplemented)
     }

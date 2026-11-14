@@ -4,6 +4,4 @@ The HWP/HWPX files were generated with bundled rhwp. The Office 97 and OOXML fil
 
 The complex DOCX contains a header, footer, merged table and landscape section. The text and CSV fixtures include multi-page examples.
 
-`locked-legacy.xls` is a copy of `office-sheets.xls` with a BIFF record marker in a later workbook mini sector replaced by `FILEPASS`. The converter test uses it to verify rejection before HTTP upload.
-
 The distribution fixtures use the synthetic content of `offline.hwp` in a `ViewText` stream. `distribution-restricted.hwp` restricts both copying and printing, while `distribution-copy-restricted.hwp` allows printing.

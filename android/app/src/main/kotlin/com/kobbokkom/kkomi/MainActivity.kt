@@ -68,6 +68,15 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        conversions.execute {
+            File(cacheDir, "office_pdfs").deleteRecursively()
+            File(cacheDir, "converted").listFiles { file ->
+                file.name.startsWith("kkomi-office-") && file.extension == "pdf"
+            }?.forEach(File::delete)
+            cacheDir.listFiles { file ->
+                file.name.startsWith("office-input-") && file.extension == "tmp"
+            }?.forEach(File::delete)
+        }
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "kkomi/viewer", DocumentWebViewFactory(messenger)
@@ -83,31 +92,6 @@ class MainActivity : FlutterActivity() {
                     "pick" -> pickDocument { document, error ->
                         if (error == null) result.success(document) else result.error("document", error, null)
                     }
-                    "officeConverterAvailable" -> {
-                        val endpoint = call.arguments as? String
-                        result.success(endpoint != null && officeConverterAvailable(this@MainActivity, endpoint))
-                    }
-                    "cachedOfficePdf" -> {
-                        val uri = call.argument<String>("uri")?.let(Uri::parse)
-                        val extension = call.argument<String>("extension")
-                        val endpoint = call.argument<String>("endpoint")
-                        if (uri?.scheme != "content" || extension == null || endpoint == null) {
-                            result.success(null)
-                        } else {
-                            conversions.execute {
-                                val pdf = runCatching {
-                                    cachedOfficePdf(this@MainActivity, uri, extension, endpoint)
-                                }.getOrNull()
-                                runOnUiThread {
-                                    if (isDestroyed) {
-                                        if (pdf != null) discardConvertedPdf(pdf)
-                                    } else {
-                                        result.success(pdf?.toString())
-                                    }
-                                }
-                            }
-                        }
-                    }
                     "docxEstimateBytes" -> {
                         val uri = (call.arguments as? String)?.let(Uri::parse)
                         if (uri?.scheme != "content") {
@@ -116,30 +100,6 @@ class MainActivity : FlutterActivity() {
                             conversions.execute {
                                 val bytes = runCatching { docxEstimateBytes(this@MainActivity, uri) }.getOrNull()
                                 runOnUiThread { if (!isDestroyed) result.success(bytes) }
-                            }
-                        }
-                    }
-                    "convertOffice" -> {
-                        val uri = call.argument<String>("uri")?.let(Uri::parse)
-                        val extension = call.argument<String>("extension")
-                        val endpoint = call.argument<String>("endpoint")
-                        val token = call.argument<String>("token")
-                        if (uri?.scheme != "content" || extension == null || endpoint == null) {
-                            result.error("conversion", "변환에 필요한 문서 정보가 없습니다.", null)
-                        } else {
-                            conversions.execute {
-                                val pdf = runCatching {
-                                    convertOffice(this@MainActivity, uri, extension, endpoint, token)
-                                }.getOrNull()
-                                runOnUiThread {
-                                    if (isDestroyed) {
-                                        if (pdf != null) discardConvertedPdf(pdf)
-                                    } else if (pdf == null) {
-                                        result.error("conversion", "서버에서 PDF로 변환할 수 없습니다.", null)
-                                    } else {
-                                        result.success(pdf.toString())
-                                    }
-                                }
                             }
                         }
                     }
@@ -212,7 +172,6 @@ class MainActivity : FlutterActivity() {
                         call.argument<String>("uri")?.let { raw ->
                             val uri = Uri.parse(raw)
                             documents.execute { runCatching { forgetDocument(uri) } }
-                            conversions.execute { runCatching { forgetOfficePdf(this@MainActivity, uri) } }
                         }
                         result.success(null)
                     }

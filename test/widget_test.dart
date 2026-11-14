@@ -8,6 +8,7 @@ import 'package:kkomi/home_tips.dart';
 import 'package:kkomi/home_strings.dart';
 import 'package:kkomi/localization.dart';
 import 'package:kkomi/main.dart';
+import 'package:kkomi/screens/document_viewer.dart';
 import 'package:kkomi/screens/document_viewer_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -281,6 +282,49 @@ void main() {
     expect(find.text('1 / ∞'), findsOneWidget);
     expect(find.text('0p'), findsOneWidget);
     expect(await saved.getStringList('document-history'), entries);
+  });
+
+  testWidgets('시스템 뷰어를 우선해도 Office 파일은 꼬미에서 연다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.withData({
+          'prefer-system-viewer': true,
+          'document-history': [
+            jsonEncode({
+              'uri': 'content://test/office',
+              'name': 'report.docx',
+              'extension': 'docx',
+            }),
+          ],
+        });
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform_views, (
+      call,
+    ) async {
+      if (call.method == 'create') return 0;
+      if (call.method == 'resize') {
+        final size = call.arguments as Map;
+        return {'width': size['width'], 'height': size['height']};
+      }
+      return null;
+    });
+    final calls = <String>[];
+    messenger.setMockMethodCallHandler(documentsChannel, (call) async {
+      calls.add(call.method);
+      return null;
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(documentsChannel, null);
+      messenger.setMockMethodCallHandler(SystemChannels.platform_views, null);
+    });
+
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('report.docx'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(DocumentViewer), findsOneWidget);
+    expect(calls, isNot(contains('openExternal')));
   });
 
   testWidgets('최근 문서 목록에서 제거를 저장한 뒤에만 파일 접근을 해제한다', (tester) async {

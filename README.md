@@ -27,7 +27,7 @@ python3 test/android_e2e.py --serial emulator-5562
 python3 test/android_migration_e2e.py --serial emulator-5562
 ```
 
-Office의 인쇄 배치를 유지해야 하는 환경에서는 [LibreOffice 변환 서비스](server/README.md)를 설정할 수 있습니다. 앱은 DOC/DOCX/XLS/XLSX/PPT/PPTX 변환을 사용자가 선택했을 때만 전송합니다. 이전에 변환한 문서는 원본 내용이 같으면 저장된 PDF를 다시 사용합니다. HWP/HWPX, PDF, TXT, CSV는 기기에서 처리합니다. 서버와 저장된 PDF 없이 Office를 열면 로컬 렌더러를 사용합니다.
+Office 파일은 앱에 포함된 OpenDocument Reader 엔진이 기기에서 엽니다. PDF 저장은 이 렌더링 결과를 인쇄합니다.
 
 디버그 APK는 `com.kobbokkom.kkomi.preview`로 설치되어 Play 설치본과 함께 사용할 수 있습니다. 하단 배너에는 AdMob 테스트 광고를 사용합니다.
 

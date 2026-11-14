@@ -6,4 +6,4 @@ Android WebView는 `appassets.androidplatform.net`의 앱 번들과 현재 문�
 
 HWP와 HWPX는 페이지를 SVG 이미지로 표시합니다. 검색어에 일치하는 위치로 이동하고 강조 표시할 수 있습니다.
 
-Office의 문서 배치를 유지하는 PDF 변환은 선택 사항입니다. 빌드에 LibreOffice 변환 주소를 설정하면 사용자가 개별 Office 문서마다 전송을 선택할 수 있습니다. HWP/HWPX는 항상 앱의 rhwp로 처리합니다.
+Office 파일은 앱에 포함된 OpenDocument Reader 엔진이 기기에서 열고 인쇄합니다. Office 문서를 열거나 PDF로 저장할 때 파일을 다른 서버로 전송하지 않습니다.

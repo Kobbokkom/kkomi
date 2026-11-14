@@ -24,7 +24,6 @@ const _preferencesKey = 'document-history';
 const _legacyHistoryPendingKey = 'legacy-document-history-pending';
 const _systemViewerKey = 'prefer-system-viewer';
 const _activityKey = 'home-reading-activity';
-const _officeConverter = String.fromEnvironment('KKOMI_OFFICE_CONVERTER_URL');
 const _summaryAnimation = Duration(milliseconds: 1200);
 
 class Home extends StatefulWidget {
@@ -52,7 +51,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   bool _legacyHistoryPending = false;
   bool _preferSystem = false;
   bool _picking = false;
-  bool _converting = false;
   bool _viewing = false;
   Document? _active;
   Route<void>? _viewerRoute;
@@ -235,7 +233,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     try {
       if (rememberImport) await _rememberImport(document);
       if (!mounted || _pending != null) return;
-      if (_preferSystem && !document.isHwp && !document.isImage) {
+      if (_preferSystem &&
+          !document.isHwp &&
+          !document.isOffice &&
+          !document.isImage) {
         try {
           await documentsChannel.invokeMethod<void>(
             'openExternal',
@@ -258,15 +259,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         } on PlatformException {
           // The WebView still supports text and CSV that cannot be paginated.
         }
-      } else if (Platform.isAndroid &&
-          document.isOffice &&
-          _officeConverter.isNotEmpty) {
-        convertedPdf = await _convertOffice(document);
       }
       if (!mounted || _pending != null) return;
       final pdf = convertedPdf;
-      final estimatedPages =
-          Platform.isAndroid && pdf == null && document.extension == 'docx'
+      final estimatedPages = Platform.isAndroid && document.extension == 'docx'
           ? await _estimateLocalDocx(document)
           : null;
       if (!mounted || _pending != null) return;
@@ -308,54 +304,6 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       return null;
     } on TimeoutException {
       return null;
-    }
-  }
-
-  Future<String?> _convertOffice(Document document) async {
-    try {
-      final arguments = {...document.toMap(), 'endpoint': _officeConverter};
-      final cached = await documentsChannel.invokeMethod<String>(
-        'cachedOfficePdf',
-        arguments,
-      );
-      if (cached != null || !mounted || _pending != null) return cached;
-      final available = await documentsChannel.invokeMethod<bool>(
-        'officeConverterAvailable',
-        _officeConverter,
-      );
-      if (available != true || !mounted || _pending != null) return null;
-      final approved = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(_t('서버에서 PDF로 변환할까요?')),
-          content: Text(
-            _t(
-              '원본 배치를 유지하기 위해 이 Office 문서를 {host} 서버로 전송합니다.',
-            ).replaceAll('{host}', Uri.parse(_officeConverter).host),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(_t('기기에서 열기')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(_t('서버에서 변환')),
-            ),
-          ],
-        ),
-      );
-      if (approved != true || !mounted || _pending != null) return null;
-      setState(() => _converting = true);
-      return await documentsChannel.invokeMethod<String>(
-        'convertOffice',
-        arguments,
-      );
-    } on PlatformException {
-      _homeMessage('서버 변환을 완료하지 못해 기기에서 엽니다.');
-      return null;
-    } finally {
-      if (mounted && _converting) setState(() => _converting = false);
     }
   }
 
@@ -489,13 +437,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(t('시스템 뷰어 우선 사용')),
-                    subtitle: Text(
-                      t(
-                        Platform.isIOS
-                            ? '가능한 경우 PDF·Office·텍스트 파일을 iOS 훑어보기로 열기'
-                            : 'HWP 계열과 사진을 제외한 문서는 가능한 경우 시스템 앱으로 열기',
-                      ),
-                    ),
+                    subtitle: Text(t('PDF와 텍스트 파일을 가능한 경우 시스템 앱으로 열기')),
                     value: _preferSystem,
                     onChanged: (value) {
                       setSheetState(() => _preferSystem = value ?? false);
@@ -551,158 +493,144 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           const SizedBox(width: 20),
         ],
       ),
-      body: _converting
-          ? Center(
-              child: CircularProgressIndicator(
-                semanticsLabel: _t('Office 문서 변환 중'),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          Text(_t('요약'), style: sectionTitle),
+          const SizedBox(height: 8),
+          _HomeSummary(
+            activity: _activity,
+            now: now,
+            tip: homeTip(languageOf(context), _tipIndex),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_t('문서'), style: sectionTitle),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  _t('HWP · HWPX 오프라인 열람'),
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontSize: 11, color: _muted),
+                ),
               ),
-            )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
-              physics: const BouncingScrollPhysics(),
-              children: [
-                Text(_t('요약'), style: sectionTitle),
-                const SizedBox(height: 8),
-                _HomeSummary(
-                  activity: _activity,
-                  now: now,
-                  tip: homeTip(languageOf(context), _tipIndex),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(_t('문서'), style: sectionTitle),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        _t('HWP · HWPX 오프라인 열람'),
-                        textAlign: TextAlign.end,
-                        style: const TextStyle(fontSize: 11, color: _muted),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _HomeCard(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const _Illustration('document_history'),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(_t('최근 문서 (최대 10개)'), style: sectionTitle),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                _HomeCard(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (_history.isEmpty)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 120),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const _Illustration('document_history'),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                _t('최근 문서 (최대 10개)'),
-                                style: sectionTitle,
+                            const Icon(
+                              Icons.insert_drive_file_outlined,
+                              size: 32,
+                              color: Color(0xFFBDBDBD),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _t('최근에 연 문서가 없어요'),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _t('파일을 열면 여기에 표시돼요'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: _muted,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        if (_history.isEmpty)
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(minHeight: 120),
-                            child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.insert_drive_file_outlined,
-                                    size: 32,
-                                    color: Color(0xFFBDBDBD),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    _t('최근에 연 문서가 없어요'),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _t('파일을 열면 여기에 표시돼요'),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: _muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        else
-                          SizedBox(
-                            height: 146,
-                            child: ListView.separated(
-                              primary: false,
-                              physics: const ClampingScrollPhysics(),
-                              padding: EdgeInsets.zero,
-                              itemCount: _history.length,
-                              itemBuilder: (_, index) =>
-                                  _recent(_history[index]),
-                              separatorBuilder: (_, _) =>
-                                  const Divider(height: 1, thickness: 0.5),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _HomeCard(
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(_radius),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                    horizontalTitleGap: 8,
-                    minTileHeight: 68,
-                    leading: const _Illustration('open_file'),
-                    title: Text(_t('파일 열기'), style: sectionTitle),
-                    subtitle: Text(
-                      'HWP · PDF · Office · CSV · TXT · ${_t('이미지')}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10, color: _muted),
-                    ),
-                    trailing: const Icon(
-                      Icons.chevron_right,
-                      size: 20,
-                      color: _muted,
-                    ),
-                    onTap: _picking || !_loaded ? null : _pick,
-                  ),
-                ),
-                if (Platform.isIOS) ...[
-                  const SizedBox(height: 10),
-                  _HomeCard(
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(_radius),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
+                    )
+                  else
+                    SizedBox(
+                      height: 146,
+                      child: ListView.separated(
+                        primary: false,
+                        physics: const ClampingScrollPhysics(),
+                        padding: EdgeInsets.zero,
+                        itemCount: _history.length,
+                        itemBuilder: (_, index) => _recent(_history[index]),
+                        separatorBuilder: (_, _) =>
+                            const Divider(height: 1, thickness: 0.5),
                       ),
-                      horizontalTitleGap: 8,
-                      minTileHeight: 56,
-                      leading: const Icon(Icons.photo_outlined, color: _muted),
-                      title: Text(_t('사진 열기'), style: sectionTitle),
-                      trailing: const Icon(
-                        Icons.chevron_right,
-                        size: 20,
-                        color: _muted,
-                      ),
-                      onTap: _picking || !_loaded
-                          ? null
-                          : () => _pick(photo: true),
                     ),
-                  ),
                 ],
-              ],
+              ),
             ),
+          ),
+          const SizedBox(height: 10),
+          _HomeCard(
+            child: ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(_radius),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+              horizontalTitleGap: 8,
+              minTileHeight: 68,
+              leading: const _Illustration('open_file'),
+              title: Text(_t('파일 열기'), style: sectionTitle),
+              subtitle: Text(
+                'HWP · PDF · Office · CSV · TXT · ${_t('이미지')}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 10, color: _muted),
+              ),
+              trailing: const Icon(
+                Icons.chevron_right,
+                size: 20,
+                color: _muted,
+              ),
+              onTap: _picking || !_loaded ? null : _pick,
+            ),
+          ),
+          if (Platform.isIOS) ...[
+            const SizedBox(height: 10),
+            _HomeCard(
+              child: ListTile(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(_radius),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                horizontalTitleGap: 8,
+                minTileHeight: 56,
+                leading: const Icon(Icons.photo_outlined, color: _muted),
+                title: Text(_t('사진 열기'), style: sectionTitle),
+                trailing: const Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: _muted,
+                ),
+                onTap: _picking || !_loaded ? null : () => _pick(photo: true),
+              ),
+            ),
+          ],
+        ],
+      ),
       bottomNavigationBar: const SafeArea(top: false, child: AdBanner()),
     );
   }
