@@ -7,20 +7,15 @@
 .pub/
 /build/
 /android/.gradle/
-/android/gradle/
-/android/gradlew
-/android/gradlew.bat
 /android/local.properties
 /android/build/
 /ios/Flutter/Flutter.framework
 /ios/Flutter/Flutter.podspec
 /ios/Pods/
 /ios/Flutter/Generated.xcconfig
-/ios/Runner.xcworkspace/
 
 # Dart
 .dart_tool/
-pubspec.lock
 *.dart.js
 *.info.json
 
@@ -35,3 +30,6 @@ pubspec.lock
 
 # Web
 web/
+
+# Python Android E2E
+__pycache__/

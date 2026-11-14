@@ -1,135 +1,40 @@
-# kkomi - 무료 문서 뷰어 🆓
+# 꼬미 Android
 
-**HWP, DOCX, PDF를 WebView + JavaScript로 처리하는 완전 무료 Flutter 앱**
+꼬미는 HWP와 HWPX를 우선 지원하는 Flutter 문서 뷰어입니다. 앱에 포함한 [rhwp](https://github.com/edwardkim/rhwp) WebAssembly를 Android WebView에서 실행합니다. 문서 바이트는 Android 파일 제공자에서 앱 내부의 WebView로 전달됩니다.
 
-## 🎯 특징
+- **HWP/HWPX** · rhwp WebView로 오프라인 열람, 암호 입력, 텍스트 선택, 검색 결과 강조, 페이지 이동과 확대, PDF 저장. 배포용 HWP는 문서에 설정된 복사·인쇄 제한을 따릅니다.
+- **PDF** · 암호 입력, 선택 가능한 텍스트, 하단 페이지 이동과 검색 결과 강조
+- **DOC/DOCX/XLS/XLSX/PPT/PPTX** · OpenDocument Reader로 오프라인 열람, 검색, PDF 저장. Word는 화면 너비에 맞춰 문단을 재배치하고, 스프레드시트는 시트별로 일부 범위를 표시합니다.
+- **TXT/CSV** · 오프라인 열람, 검색과 PDF 저장
 
-- ✅ **완전 무료** - 서버 비용 0, 모든 라이브러리 오픈소스
-- ✅ **오프라인 작동** - 인터넷 없어도 작동
-- ✅ **개인정보 보안** - 파일이 로컬에만 존재
-- ✅ **빠른 응답** - WebView 내 로컬 처리
-- ✅ **교차 플랫폼** - iOS/Android 동시 지원
+홈에서 주간 열람, 전체 문서 페이지 수, 연속 사용, 최근 문서(최대 10개)와 상식 카드를 확인할 수 있습니다. 같은 앱으로 업데이트할 때는 기존 홈 통계, 시스템 뷰어 선호, 접근 가능한 최근 문서 기록을 이어받습니다.
 
-## 📋 지원 포맷
+## Android 빌드
 
-| 포맷 | 상태 | 품질 |
-|------|------|------|
-| **PDF** | ✅ 지원 | 우수 |
-| **DOCX** | ✅ 지원 | 우수 |
-| **HWPX** | ✅ 지원 | 우수 |
-| **HWP** | ⚠️ 부분 지원 | 중간 |
+Android SDK 37과 Flutter가 필요합니다.
 
-## 🛠️ 구조
-
-```
-kkomi/
-├─ lib/
-│  ├─ main.dart (앱 진입점)
-│  └─ screens/
-│     └─ document_viewer.dart (뷰어 UI)
-├─ assets/
-│  └─ viewer.html (JavaScript 처리 로직)
-└─ pubspec.yaml (의존성)
-```
-
-## 📦 사용 라이브러리
-
-### Flutter
-- `webview_flutter` - WebView 통합
-- `file_picker` - 파일 선택
-
-### JavaScript (CDN)
-- `PDF.js` - PDF 렌더링
-- `hwp.js` - HWP/HWPX 파싱
-- `Mammoth.js` - DOCX 변환
-
-**모두 무료 오픈소스!**
-
-## 🚀 설치 & 실행
-
-### 1단계: 의존성 설치
-```bash
-cd ~/Documents/code/kkomi
+```sh
 flutter pub get
+flutter analyze
+flutter test
+flutter build apk --debug --target-platform android-arm64
 ```
 
-### 2단계: 앱 실행
+Android 앱의 파일 선택, 공유, 검색, 암호 및 저장 흐름은 별도 테스트에서 검증할 수 있습니다. 아래 명령은 지정한 테스트용 에뮬레이터의 꼬미 미리보기 데이터만 초기화합니다. 시스템 UI가 영어인 Google Android 이미지와 호스트의 Poppler `pdftotext`가 필요합니다.
 
-#### iOS
-```bash
-flutter run -d iphone
+```sh
+python3 test/android_e2e.py --serial emulator-5562
+python3 test/android_migration_e2e.py --serial emulator-5562
 ```
 
-#### Android
-```bash
-flutter run -d android
-```
+Office의 인쇄 배치를 유지해야 하는 환경에서는 [LibreOffice 변환 서비스](server/README.md)를 설정할 수 있습니다. 앱은 DOC/DOCX/XLS/XLSX/PPT/PPTX 변환을 사용자가 선택했을 때만 전송합니다. 이전에 변환한 문서는 원본 내용이 같으면 저장된 PDF를 다시 사용합니다. HWP/HWPX, PDF, TXT, CSV는 기기에서 처리합니다. 서버와 저장된 PDF 없이 Office를 열면 로컬 렌더러를 사용합니다.
 
-#### 웹 (테스트용)
-```bash
-flutter run -d chrome
-```
+디버그 APK는 `com.kobbokkom.kkomi.preview`로 설치되어 Play 설치본과 함께 사용할 수 있습니다. 하단 배너에는 AdMob 테스트 광고를 사용합니다.
 
-## 📱 사용 방법
+릴리스 빌드는 기존 꼬미의 AdMob 앱과 배너 단위를 사용합니다. 변경할 때는 Gradle 속성 `androidAdMobAppId`와 Flutter의 `--dart-define=ANDROID_ADMOB_BANNER_ID=...`를 사용합니다. Play 업로드 서명 정보는 로컬 `android/key.properties`의 `storeFile`, `storePassword`, `keyAlias`, `keyPassword`에 설정합니다.
 
-1. 앱 실행
-2. **파일 선택** 버튼 터치
-3. HWP/HWPX/DOCX/PDF 파일 선택
-4. WebView에서 자동으로 렌더링됨
-5. 스크롤/확대로 문서 보기
+## iOS 빌드
 
-## ⚙️ 개발 정보
+iOS 18 이상에서 Files로 문서를 열 수 있습니다. HWP와 HWPX는 기기 안에서 rhwp를 실행합니다. iOS 디버그 빌드는 AdMob 테스트 ID를, 릴리스 빌드는 기존 꼬미 iOS 앱과 배너 ID를 사용합니다. 앱 ID는 `ios/Flutter/Release.xcconfig`, 배너 ID는 `IOS_ADMOB_BANNER_ID`에서 설정합니다.
 
-### 파일 처리 흐름
-
-```
-사용자 선택
-    ↓
-flutter (file_picker)
-    ↓
-Base64 인코딩
-    ↓
-WebView 전달
-    ↓
-JavaScript (hwp.js/PDF.js/Mammoth.js)
-    ↓
-HTML/Canvas 렌더링
-    ↓
-사용자 보기
-```
-
-## ⚠️ 제한사항
-
-1. **HWP 복잡도**
-   - hwp.js는 완벽하지 않음
-   - 복잡한 서식/표 일부 미지원
-   - HWPX는 거의 완벽 지원
-
-2. **파일 크기**
-   - 50MB 이상 파일은 성능 저하
-   - 메모리 사용량 증가
-
-3. **오프라인**
-   - JavaScript 라이브러리는 CDN에서 로드
-   - 초기 로드 후 오프라인 가능
-
-## 🐛 문제 해결
-
-### PDF가 로드 안 됨
-- 파일 포맷 확인
-- 파일 크기 확인 (<50MB 추천)
-- 콘솔 확인: `flutter run -v`
-
-### HWP 렌더링이 이상함
-- HWPX 사용 (Hancom 2010+)
-- hwp.js는 모든 서식 미지원
-- 복잡한 서식은 PDF로 변환 후 사용
-
-### 메모리 부족
-- 파일 크기 줄이기
-- 페이지 분할 로드 구현
-- 앱 재시작
-
----
-
-**Made with ❤️ - 완전 무료로 만든 문서 뷰어**
+서드파티 라이선스와 고지는 `assets/js/rhwp-LICENSE.txt`, `assets/js/rhwp-NOTICES.zip`, `assets/js/vendor/`, `tools/hwp-policy/THIRD_PARTY_NOTICES.txt`에 있습니다.

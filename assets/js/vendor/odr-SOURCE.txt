@@ -1,0 +1,6 @@
+OpenDocument.core @opendocument/odr-core 7.7.0
+License: MPL-2.0 (see odr-LICENSE)
+Source: https://github.com/opendocument-app/OpenDocument.core/tree/v7.7.0
+Distribution: https://registry.npmjs.org/@opendocument/odr-core/-/odr-core-7.7.0.tgz
+Package integrity: sha512-2rr9FVzDGaz+0bBtvqcE/3NqsAa+C+ahGA/URGK7cMR6GCxN77P5gpd+5v82kCgRijP3AexFUQfl4eeXyWTXZA==
+Packaged files are unmodified. The package's index.js is named odr-7.7.0.mjs here.

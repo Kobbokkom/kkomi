@@ -1,222 +1,83 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>문서 뷰어</title>
-    <!-- 로컬 번들 파일 로드 (CDN 제거) -->
-    <script src="js/pdf.min.js"></script>
-    <script src="js/mammoth.browser.min.js"></script>
-    <!-- hwp.js는 아래에서 로드 -->
-    <script src="https://cdn.jsdelivr.net/npm/hwp.js@latest/dist/hwp.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f5f5f5;
-        }
-
-        #viewer {
-            width: 100%;
-            height: 100vh;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 10px;
-        }
-
-        .page {
-            margin: 10px auto;
-            background: white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            page-break-after: always;
-        }
-
-        canvas {
-            display: block;
-            max-width: 100%;
-            height: auto;
-        }
-
-        .document-content {
-            background: white;
-            padding: 40px;
-            max-width: 900px;
-            margin: 10px auto;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            line-height: 1.6;
-        }
-
-        .document-content * {
-            max-width: 100%;
-        }
-
-        .document-content table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0;
-        }
-
-        .document-content td, .document-content th {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            font-size: 18px;
-            color: #666;
-        }
-
-        .error {
-            background-color: #fee;
-            color: #c33;
-            padding: 20px;
-            margin: 20px;
-            border-radius: 4px;
-            border-left: 4px solid #c33;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; worker-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>꼬미 문서 뷰어</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #efefee; color: #262520; font: 16px/1.65 system-ui, sans-serif; }
+    #viewer { padding: 8px; }
+    .image-viewer { display: grid; place-items: center; min-height: 100dvh; }
+    .image-viewer img {
+      display: block; max-width: 100%; max-height: calc(100dvh - 16px);
+      object-fit: contain; -webkit-user-select: none; user-select: none;
+    }
+    .image-viewer.image-original { justify-items: safe center; }
+    .image-viewer.image-original img { max-width: none; max-height: none; }
+    .page, .other-document-page, .other-pdf-page { width: min(100%, 960px); margin: 0 auto 10px; background: white; box-shadow: 0 1px 5px #0002; }
+    .page { position: relative; }
+    .hwp-matches { position: absolute; inset: 0; pointer-events: none; }
+    .hwp-matches span { position: absolute; background: #ffd53b66; }
+    .hwp-matches .selected { background: #ffa82b99; }
+    .page > img, .other-pdf-page > canvas { display: block; width: 100%; height: auto; }
+    .page > img { -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
+    .hwp-selectable-text {
+      position: absolute; inset: 0; overflow: clip; container-type: inline-size;
+      white-space: pre; font-size: 0; line-height: 0;
+    }
+    .hwp-selectable-text > span {
+      position: absolute; color: transparent; font-family: sans-serif; white-space: pre;
+      transform-origin: left center; text-size-adjust: none; -webkit-text-size-adjust: none;
+      -webkit-user-select: text; user-select: text;
+    }
+    .hwp-selectable-text > span::selection { color: transparent; background: #619bff66; }
+    body:has(.other-pdf-page) { background: #9e9e9e; }
+    .other-pdf-page { position: relative; overflow: clip; }
+    .pdf-text-layer {
+      position: absolute; inset: 0; overflow: clip; text-align: start; line-height: 1;
+      direction: ltr; transform-origin: 0 0; text-size-adjust: none; -webkit-text-size-adjust: none;
+      --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+      --min-font-size-inv: calc(1 / var(--min-font-size));
+    }
+    .pdf-text-layer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+    .pdf-text-layer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+    .pdf-text-layer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
+    .pdf-text-layer > :is(span, br) {
+      position: absolute; color: transparent; white-space: pre; transform-origin: 0 0;
+      font-size: calc(var(--text-scale-factor) * var(--font-height, 0px));
+      transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)) scale(var(--min-font-size-inv));
+      -webkit-user-select: text; user-select: text;
+    }
+    .pdf-text-layer.pdf-copy-disabled, .pdf-text-layer.pdf-copy-disabled > :is(span, br) {
+      -webkit-user-select: none; user-select: none;
+    }
+    .pdf-text-layer .highlight { background: #ffd50059; border-radius: 2px; }
+    .pdf-text-layer .highlight.selected { background: #ffa000a6; scroll-margin-top: 32px; }
+    .other-document-page { padding: 16px; overflow-wrap: anywhere; }
+    .other-document-page img { max-width: 100%; height: auto; }
+    .other-table { max-width: 100%; overflow: auto; }
+    .other-table table, .other-document-page table { border-collapse: collapse; }
+    th, td { border: 1px solid #d5d2ce; padding: 4px 8px; text-align: start; }
+    .other-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .hwp-print-document { display: none; }
+    @media print {
+      @page kkomi-hwp { margin: 0; }
+      body { background: white; }
+      #viewer, .other-document-page { padding: 0; margin: 0; box-shadow: none; }
+      .hwp-print-ready #viewer { display: none; }
+      .hwp-print-ready .hwp-print-document { display: block; page: kkomi-hwp; }
+      .hwp-print-document > img {
+        display: block; width: 100%; height: calc(100vh - 1px);
+        object-fit: contain; object-position: center; break-inside: avoid; break-after: page;
+      }
+      .hwp-print-document > img:last-child { break-after: auto; }
+    }
+  </style>
+  <script type="module" src="js/viewer.js"></script>
 </head>
 <body>
-    <div id="viewer"></div>
-
-    <script>
-        // PDF.js 워커 설정 (로컬 번들 사용)
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdf.worker.min.js';
-
-        // Flutter에서 메시지 받기
-        window.addEventListener('message', async (event) => {
-            try {
-                const { type, data, fileName } = event.data;
-
-                if (type === 'load-file') {
-                    showLoading();
-                    const fileData = Uint8Array.from(atob(data), c => c.charCodeAt(0));
-
-                    if (fileName.endsWith('.hwp') || fileName.endsWith('.hwpx')) {
-                        await loadHWP(fileData, fileName);
-                    } else if (fileName.endsWith('.docx')) {
-                        await loadDOCX(fileData);
-                    } else if (fileName.endsWith('.pdf')) {
-                        await loadPDF(fileData);
-                    } else {
-                        showError('지원하지 않는 파일 형식입니다: ' + fileName);
-                    }
-                }
-            } catch (err) {
-                console.error('파일 처리 오류:', err);
-                showError('파일 처리 중 오류가 발생했습니다: ' + err.message);
-            }
-        });
-
-        function showLoading() {
-            const viewer = document.getElementById('viewer');
-            viewer.innerHTML = '<div class="loading">파일을 처리 중입니다...</div>';
-        }
-
-        function showError(message) {
-            const viewer = document.getElementById('viewer');
-            viewer.innerHTML = `<div class="error"><strong>오류:</strong> ${message}</div>`;
-            callFlutter('onError', message);
-        }
-
-        function callFlutter(event, message) {
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.flutter_inappwebview) {
-                window.webkit.messageHandlers.flutter_inappwebview.postMessage({
-                    method: event,
-                    args: message
-                });
-            }
-        }
-
-        // HWP 파싱 및 렌더링
-        async function loadHWP(fileData, fileName) {
-            try {
-                if (fileName.endsWith('.hwpx')) {
-                    // HWPX는 ZIP 형식이므로 다르게 처리
-                    const document = HWP.parse(fileData);
-                    const html = HWP.toHTML(document);
-                    renderHTML(html);
-                } else {
-                    // HWP 파일
-                    const document = HWP.parse(fileData);
-                    const html = HWP.toHTML(document);
-                    renderHTML(html);
-                }
-                callFlutter('onSuccess', 'HWP 파일 로드 완료');
-            } catch (err) {
-                console.error('HWP 파싱 실패:', err);
-                showError('HWP 파일을 읽을 수 없습니다: ' + err.message);
-            }
-        }
-
-        // DOCX 파싱 (Mammoth.js)
-        async function loadDOCX(fileData) {
-            try {
-                const result = await mammoth.convertArrayBuffer({
-                    arrayBuffer: fileData.buffer
-                });
-
-                const html = result.value;
-                renderHTML(html);
-                callFlutter('onSuccess', 'DOCX 파일 로드 완료');
-            } catch (err) {
-                console.error('DOCX 파싱 실패:', err);
-                showError('DOCX 파일을 읽을 수 없습니다: ' + err.message);
-            }
-        }
-
-        // PDF 렌더링
-        async function loadPDF(fileData) {
-            try {
-                const pdf = await pdfjsLib.getDocument({ data: fileData }).promise;
-                const viewer = document.getElementById('viewer');
-                viewer.innerHTML = '';
-
-                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                    const page = await pdf.getPage(pageNum);
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-
-                    const viewport = page.getViewport({ scale: 2.0 });
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-
-                    await page.render({
-                        canvasContext: context,
-                        viewport: viewport,
-                    }).promise;
-
-                    const pageDiv = document.createElement('div');
-                    pageDiv.className = 'page';
-                    pageDiv.appendChild(canvas);
-                    viewer.appendChild(pageDiv);
-                }
-
-                callFlutter('onSuccess', `PDF 파일 로드 완료 (${pdf.numPages}페이지)`);
-            } catch (err) {
-                console.error('PDF 렌더링 실패:', err);
-                showError('PDF 파일을 읽을 수 없습니다: ' + err.message);
-            }
-        }
-
-        // HTML 렌더링 헬퍼
-        function renderHTML(html) {
-            const viewer = document.getElementById('viewer');
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'document-content';
-            contentDiv.innerHTML = html;
-            viewer.innerHTML = '';
-            viewer.appendChild(contentDiv);
-        }
-    </script>
+  <main id="viewer" aria-label="문서"></main>
 </body>
 </html>

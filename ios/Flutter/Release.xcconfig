@@ -1,1 +1,2 @@
 #include "Generated.xcconfig"
+ADMOB_APP_ID = ca-app-pub-6737616702687889~9635967736

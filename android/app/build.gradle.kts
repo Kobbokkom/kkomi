@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,9 +7,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val previewSuffix = providers.gradleProperty("androidPreviewSuffix").orElse(".preview").get()
+require(previewSuffix in setOf(".preview", ".preview.migration"))
+
+val uploadSigning = Properties()
+val signingFile = rootProject.file("key.properties")
+if (signingFile.isFile) {
+    signingFile.inputStream().use { uploadSigning.load(it) }
+}
+
 android {
-    namespace = "com.example.kkomi"
-    compileSdk = flutter.compileSdkVersion
+    namespace = "com.kobbokkom.kkomi"
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,25 +31,46 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.kkomi"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        applicationId = "com.kobbokkom.kkomi"
+        minSdk = 24
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["admobAppId"] = providers.gradleProperty("androidAdMobAppId")
+            .orElse("ca-app-pub-6737616702687889~7960117509").get()
+        manifestPlaceholders["appLabel"] = "꼬미"
+    }
+
+    signingConfigs {
+        if (signingFile.isFile) {
+            create("upload") {
+                storeFile = rootProject.file(requireNotNull(uploadSigning.getProperty("storeFile")))
+                storePassword = uploadSigning.getProperty("storePassword")
+                keyAlias = uploadSigning.getProperty("keyAlias")
+                keyPassword = uploadSigning.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
+        for (name in listOf("debug", "profile")) {
+            maybeCreate(name).apply {
+                applicationIdSuffix = previewSuffix
+                manifestPlaceholders["appLabel"] = "꼬미 미리보기"
+                manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            }
+        }
+
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.webkit:webkit:1.15.0")
 }
