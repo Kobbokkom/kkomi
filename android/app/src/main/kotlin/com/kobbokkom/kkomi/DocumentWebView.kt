@@ -156,6 +156,9 @@ private class DocumentWebView(
                         }
                     }
                     "ready", "page" -> channel.invokeMethod(event, data.optInt("value"))
+                    "outline" -> if (extension == "hwp" || extension == "hwpx") {
+                        channel.invokeMethod(event, data.optString("value"))
+                    }
                     "error" -> channel.invokeMethod(event, data.optString("value"))
                     "password" -> channel.invokeMethod(event, data.optBoolean("value"))
                     "canPrint" -> {

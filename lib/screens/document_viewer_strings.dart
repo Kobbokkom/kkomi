@@ -54,6 +54,17 @@ const viewerStrings = <String, List<String>>{
     'Abrir',
     'Buka',
   ],
+  '목차': [
+    'Contents',
+    '目次',
+    '目录',
+    '目錄',
+    'Índice',
+    'Sommaire',
+    'Inhaltsverzeichnis',
+    'Sumário',
+    'Daftar isi',
+  ],
   '페이지 이동': [
     'Go to page',
     'ページに移動',

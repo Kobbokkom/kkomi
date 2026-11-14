@@ -7,9 +7,16 @@ const maxPageSvgBytes = 24 * 1024 * 1024;
 const maxPrintSvgBytes = 64 * 1024 * 1024;
 const maxTextLayoutLength = 2 * 1024 * 1024;
 const maxTextRuns = 2000;
+// shortcut: cap the source JSON and the entries sent through the bridge; paginate if longer outlines are needed.
+const maxOutlineJsonLength = 2 * 1024 * 1024;
+const maxOutlineItems = 2000;
 const cfbSignature = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
 const noCopy = 1;
 const noPrint = 2;
+
+function truncateLabel(text, limit) {
+    return text.slice(0, limit).replace(/[\uD800-\uDBFF]$/, '');
+}
 
 async function restrictionsFor(bytes) {
     if (!cfbSignature.every((byte, index) => bytes[index] === byte)) return 0;
@@ -93,11 +100,41 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
         moveOccurrence,
         preparePrint,
         releasePrint,
+        ...(restrictions & noCopy ? {} : { readOutline }),
         goToPage(index) {
             pages[index]?.scrollIntoView({ block: 'start', inline: 'nearest' });
         },
         dispose,
     };
+
+    function readOutline() {
+        if (disposed) return [];
+        try {
+            const json = doc.getOutlineNavigation();
+            if (json.length > maxOutlineJsonLength) return [];
+            const { outline } = JSON.parse(json);
+            if (!Array.isArray(outline)) return [];
+
+            const items = [];
+            for (const entry of outline) {
+                if (!entry) continue;
+                const { level, number, title, page } = entry;
+                if (!Number.isInteger(level) || level < 1 || level > 10 ||
+                    !Number.isInteger(page) || page < 1 || page > pageCount ||
+                    typeof number !== 'string' || typeof title !== 'string') continue;
+                items.push({
+                    level,
+                    number: truncateLabel(number, 32),
+                    title: truncateLabel(title, 160),
+                    page,
+                });
+                if (items.length === maxOutlineItems) break;
+            }
+            return items;
+        } catch {
+            return [];
+        }
+    }
 
     function pageSvg(index) {
         const blob = new Blob([doc.renderPageSvg(index)], { type: 'image/svg+xml' });

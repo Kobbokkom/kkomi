@@ -285,6 +285,10 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
     case "canPrint":
       canPrintHwp = value as? Bool ?? false
       channel.invokeMethod(event, arguments: canPrintHwp)
+    case "outline":
+      if isHwp, let outline = value as? String {
+        channel.invokeMethod(event, arguments: outline)
+      }
     case "page", "error", "password", "matches":
       channel.invokeMethod(event, arguments: value)
     case "printMedia":

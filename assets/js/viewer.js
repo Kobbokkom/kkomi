@@ -83,6 +83,12 @@ globalThis.openDocument = async (extension, localizedStrings) => {
         (width, height) => report('printMedia', { width, height }));
     }
     report('ready', documentView.pageCount);
+    if (documentView.readOutline) {
+      setTimeout(() => {
+        const items = documentView.readOutline();
+        if (items.length) report('outline', JSON.stringify(items));
+      }, 0);
+    }
   } catch (error) {
     if (error.name === 'AbortError') return;
     if (imageTypes.has(extension)) {

@@ -10,6 +10,8 @@ import '../documents.dart';
 import '../localization.dart';
 import 'document_viewer_strings.dart';
 
+typedef _OutlineItem = ({int level, String title, int page});
+
 class DocumentViewer extends StatefulWidget {
   const DocumentViewer({
     super.key,
@@ -41,6 +43,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
   bool _preparingPdf = false;
   bool _hwpCanPrint = false;
   bool _imageFit = true;
+  List<_OutlineItem> _outline = const [];
 
   bool get _isPdf =>
       widget.document.extension == 'pdf' || widget.convertedPdf != null;
@@ -102,6 +105,11 @@ class _DocumentViewerState extends State<DocumentViewer> {
           if (firstLoad && _pageCount > 0) widget.onOpened(_pageCount);
         case 'page':
           setState(() => _page = call.arguments as int);
+        case 'outline':
+          if (widget.document.isHwp && call.arguments is String) {
+            final outline = _readOutline(call.arguments as String);
+            setState(() => _outline = outline);
+          }
         case 'password':
           unawaited(_promptPassword(call.arguments as bool));
         case 'canPrint':
@@ -247,6 +255,93 @@ class _DocumentViewerState extends State<DocumentViewer> {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     field.dispose();
     if (value != null && mounted) await _invoke('page', value);
+  }
+
+  List<_OutlineItem> _readOutline(String json) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(json);
+    } on FormatException {
+      return const [];
+    }
+    if (decoded is! List) return const [];
+    return [
+      for (final item in decoded)
+        if (item case {
+          'level': final int level,
+          'number': final String number,
+          'title': final String title,
+          'page': final int page,
+        } when level >= 1 && level <= 10 && page >= 1 && page <= _pageCount)
+          (level: level, title: '$number $title'.trim(), page: page),
+    ];
+  }
+
+  Future<void> _selectOutlinePage() async {
+    final outline = _outline;
+    final page = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.65,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsetsDirectional.only(start: 20, end: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          _text('목차'),
+                          style: Theme.of(sheetContext).textTheme.titleLarge,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      tooltip: MaterialLocalizations.of(
+                        sheetContext,
+                      ).closeButtonTooltip,
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: outline.length,
+                  itemBuilder: (context, index) {
+                    final item = outline[index];
+                    return ListTile(
+                      contentPadding: EdgeInsetsDirectional.only(
+                        start: 20 + 9.0 * (item.level - 1),
+                        end: 20,
+                      ),
+                      title: Text(item.title),
+                      trailing: Text(
+                        _text('{page}쪽').replaceAll('{page}', '${item.page}'),
+                      ),
+                      onTap: () => Navigator.pop(sheetContext, item.page - 1),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (page != null && mounted) await _invoke('page', page);
   }
 
   @override
@@ -468,6 +563,8 @@ class _DocumentViewerState extends State<DocumentViewer> {
                     _toggleSearch();
                   case 'page':
                     unawaited(_selectPage());
+                  case 'outline':
+                    unawaited(_selectOutlinePage());
                   case 'imageFit':
                     setState(() => _imageFit = !_imageFit);
                     unawaited(_invoke('imageFit', _imageFit));
@@ -484,6 +581,8 @@ class _DocumentViewerState extends State<DocumentViewer> {
               itemBuilder: (_) => [
                 if (ready && !widget.document.isImage && !_searching)
                   PopupMenuItem(value: 'search', child: Text(_text('검색'))),
+                if (ready && _outline.isNotEmpty)
+                  PopupMenuItem(value: 'outline', child: Text(_text('목차'))),
                 if (ready && _pageCount > 1)
                   PopupMenuItem(value: 'page', child: Text(_text('페이지 이동'))),
                 if (ready && widget.document.isImage)
