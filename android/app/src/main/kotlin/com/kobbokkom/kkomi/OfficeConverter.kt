@@ -42,6 +42,8 @@ private const val MAX_CACHED_OFFICE_PDFS = 10
 private const val MAX_OFFICE_CACHE_BYTES = 128L * 1024 * 1024
 private val cachedPdfName = Regex("[0-9a-f]{64}-[0-9a-f]{64}\\.pdf")
 private val pdfMagic = "%PDF-".toByteArray(Charsets.US_ASCII)
+private val pdfTrailer = Regex("startxref\\s+(\\d+)\\s+%%EOF\\s*$")
+private val pdfCrossReference = Regex("^(xref\\s|\\d+\\s+\\d+\\s+obj\\b)")
 private val conversionDeadlines = ScheduledThreadPoolExecutor(1) { task ->
     Thread(task, "office-conversion-timeout").apply { isDaemon = true }
 }.apply { removeOnCancelPolicy = true }
@@ -142,9 +144,7 @@ private fun officePdfUri(context: Context, file: File): Uri =
 
 private fun openCachedOfficePdf(context: Context, cache: File): Uri? {
     if (!cache.isFile) return null
-    if (cache.length() !in pdfMagic.size.toLong()..MAX_DOCUMENT_BYTES ||
-        !cache.inputStream().use { it.startsWith(pdfMagic) }
-    ) {
+    if (!hasPdfStructure(cache)) {
         cache.delete()
         return null
     }
@@ -230,13 +230,32 @@ private fun requestPdf(url: URL, source: File, output: File, token: String?) {
         val copied = connection.inputStream.use { input ->
             output.outputStream().use { input.copyBoundedTo(it) }
         }
-        if ((length >= 0 && copied != length) ||
-            !output.inputStream().use { it.startsWith(pdfMagic) }
-        ) throw IOException("Office converter returned an invalid PDF")
+        if ((length >= 0 && copied != length) || !hasPdfStructure(output)) {
+            throw IOException("Office converter returned an invalid PDF")
+        }
         if (expired.get()) throw IOException("Office conversion timed out")
     } finally {
         timeout.cancel(false)
         connection.disconnect()
+    }
+}
+
+private fun hasPdfStructure(file: File): Boolean {
+    val size = file.length()
+    if (size !in pdfMagic.size.toLong()..MAX_DOCUMENT_BYTES ||
+        !file.inputStream().use { it.startsWith(pdfMagic) }) return false
+    return RandomAccessFile(file, "r").use { pdf ->
+        val tail = ByteArray(minOf(size, 1024).toInt())
+        pdf.seek(size - tail.size)
+        pdf.readFully(tail)
+        val trailer = pdfTrailer.find(tail.toString(Charsets.US_ASCII)) ?: return@use false
+        val xref = trailer.groupValues[1].toLongOrNull() ?: return@use false
+        val trailerStart = size - tail.size + trailer.range.first
+        if (xref !in pdfMagic.size.toLong() until trailerStart) return@use false
+        val marker = ByteArray(minOf(trailerStart - xref, 64).toInt())
+        pdf.seek(xref)
+        pdf.readFully(marker)
+        pdfCrossReference.containsMatchIn(marker.toString(Charsets.US_ASCII))
     }
 }
 
