@@ -261,12 +261,14 @@ def export_pdf(device, filename, *, direct=False, local_copy=None):
                                                     for value in device.labels(n)), "Save as PDF destination"))
         device.click(device.wait(lambda n: any(value in ("Save to PDF", "PDF에 저장")
                                                 for value in device.labels(n)), "save print output"))
-    device.click(device.wait(
+    field = device.wait(
         lambda n: n.get("class") == "android.widget.EditText",
         "save filename",
-    ))
+    )
+    device.click(field)
     device.shell("input", "keyevent", "KEYCODE_MOVE_END")
-    device.shell("input", "keyevent", *(["KEYCODE_DEL"] * 22))
+    if name_length := len(field.get("text", "")):
+        device.shell("input", "keyevent", *(["KEYCODE_DEL"] * name_length))
     device.text(filename)
     device.click(device.wait(
         lambda n: n.get("resource-id") == "android:id/button1" and
