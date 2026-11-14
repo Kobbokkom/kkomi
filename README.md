@@ -40,4 +40,6 @@ PPTX·PPSX·POTX는 Office Kit로 표시합니다. 암호화된 프레젠테이�
 
 iOS 18 이상에서 Files로 문서를 열 수 있습니다. HWP와 HWPX는 기기 안에서 rhwp를 실행합니다. iOS 디버그 빌드는 AdMob 테스트 ID를, 릴리스 빌드는 기존 꼬미 iOS 앱과 배너 ID를 사용합니다. 앱 ID는 `ios/Flutter/Release.xcconfig`, 배너 ID는 `IOS_ADMOB_BANNER_ID`에서 설정합니다.
 
+꼬미의 현재 iOS 배포에서는 [`ios/Runner/Info.plist`](ios/Runner/Info.plist)의 `ITSAppUsesNonExemptEncryption=false`를 사용합니다. TestFlight에서 이 값이 들어가지 않은 빌드가 ‘수출 규정 정보 누락’으로 표시되면 App Store Connect에서 같은 응답을 저장하고 내부 그룹의 테스트 상태를 확인합니다. 암호화 기능이나 배포 범위가 바뀔 때 이 설정을 검토합니다.
+
 서드파티 라이선스와 고지는 `assets/js/rhwp-LICENSE.txt`, `assets/js/rhwp-NOTICES.zip`, `assets/js/vendor/`, `tools/hwp-policy/THIRD_PARTY_NOTICES.txt`에 있습니다.

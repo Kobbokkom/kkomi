@@ -25,6 +25,8 @@
 	<string>kkomi</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>ko</string><string>en</string><string>ja</string>
