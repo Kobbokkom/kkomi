@@ -183,7 +183,11 @@ class _DocumentViewerState extends State<DocumentViewer> {
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        scrollable: true,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         title: Text(_text('문서 암호')),
+        titleTextStyle: Theme.of(dialogContext).textTheme.titleMedium,
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
         content: TextField(
           autofocus: true,
           obscureText: true,
@@ -193,15 +197,21 @@ class _DocumentViewerState extends State<DocumentViewer> {
           onSubmitted: (value) => Navigator.pop(dialogContext, value),
           decoration: InputDecoration(
             labelText: _text('암호'),
-            errorText: incorrect ? _text('암호가 올바르지 않습니다.') : null,
+            error: incorrect ? Text(_text('암호가 올바르지 않습니다.')) : null,
           ),
         ),
         actions: [
           TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(_text('취소')),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
             onPressed: () => Navigator.pop(dialogContext, password),
             child: Text(_text('열기')),
           ),
@@ -245,7 +255,13 @@ class _DocumentViewerState extends State<DocumentViewer> {
         }
 
         return AlertDialog(
+          scrollable: true,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 12,
+          ),
           title: Text(_text('페이지 이동')),
+          titleTextStyle: Theme.of(dialogContext).textTheme.titleMedium,
           content: TextField(
             controller: field,
             keyboardType: TextInputType.number,
@@ -417,38 +433,72 @@ class _DocumentViewerState extends State<DocumentViewer> {
 
   Widget _documentToolbar() {
     final count = _matches;
+    final countStyle = Theme.of(context).textTheme.bodySmall;
+    final countText = count == null || _search.text.trim().isEmpty
+        ? null
+        : count == 0
+        ? '0 / 0'
+        : '$_currentMatch / $count';
+    final counter = countText == null
+        ? null
+        : Semantics(
+            liveRegion: true,
+            label: count == 0
+                ? _text('검색 결과 없음')
+                : _text('검색 결과 {current} / {count}')
+                      .replaceAll('{current}', '$_currentMatch')
+                      .replaceAll('{count}', '$count'),
+            excludeSemantics: true,
+            child: Text(countText, style: countStyle),
+          );
     return Material(
       color: Colors.white,
       child: SafeArea(
         top: false,
         bottom: false,
-        child: SizedBox(
-          height: 56,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
           child: _searching || !_hasPageToolbar
               ? Padding(
-                  padding: const EdgeInsets.only(left: 12, right: 4),
-                  child: Row(
-                    children: [
-                      Expanded(child: _searchField(outlined: true)),
-                      if (_search.text.trim().isNotEmpty && count != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Semantics(
-                            liveRegion: true,
-                            label: count == 0
-                                ? _text('검색 결과 없음')
-                                : _text('검색 결과 {current} / {count}')
-                                      .replaceAll('{current}', '$_currentMatch')
-                                      .replaceAll('{count}', '$count'),
-                            excludeSemantics: true,
-                            child: Text(
-                              count == 0 ? '0 / 0' : '$_currentMatch / $count',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      const minSearchWidth = 112.0;
+                      const controlsWidth = 3 * kMinInteractiveDimension;
+                      final counterWidth = countText == null
+                          ? 0.0
+                          : TextPainter.computeWidth(
+                              text: TextSpan(
+                                text: countText,
+                                style: countStyle,
+                              ),
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                              locale: Localizations.localeOf(context),
+                            );
+                      final stackCounter =
+                          counter != null &&
+                          constraints.maxWidth <
+                              minSearchWidth + controlsWidth + counterWidth + 8;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (stackCounter) counter,
+                          Row(
+                            children: [
+                              Expanded(child: _searchField(outlined: true)),
+                              if (counter != null && !stackCounter)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: counter,
+                                ),
+                              ..._searchActions(),
+                            ],
                           ),
-                        ),
-                      ..._searchActions(),
-                    ],
+                        ],
+                      );
+                    },
                   ),
                 )
               : Row(

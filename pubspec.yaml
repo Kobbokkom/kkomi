@@ -33,6 +33,15 @@ flutter:
     - assets/js/vendor/pdf/standard_fonts/
     - assets/js/vendor/pdf/iccs/
     - assets/js/vendor/pdf/wasm/
+    - assets/fonts/Pretendard-OFL.txt
+    - assets/fonts/NotoSansCJK-OFL.txt
     - tools/hwp-policy/THIRD_PARTY_NOTICES.txt
     - tools/odr/7.7.0.patch
     - tools/odr/build.sh
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/PretendardVariable.ttf
+    - family: Noto Sans CJK
+      fonts:
+        - asset: assets/fonts/NotoSansCJKsc-Regular.otf

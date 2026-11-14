@@ -75,7 +75,7 @@ function renderOffice(extension, bytes, requestPassword, script = './office-work
     const startTimeout = () => {
       timeout = setTimeout(() => {
         finish();
-        reject(new Error("문서를 표시하는 데 시간이 너무 오래 걸려요."));
+        reject(new Error("Office rendering timed out", { cause: "officeRenderTimeout" }));
       }, 25000);
     };
     window.addEventListener("pagehide", finish, { once: true });
@@ -124,6 +124,11 @@ function copyOfficeElement(node) {
   if (node.localName === "img") {
     const src = node.getAttribute("src") ?? "";
     if (!/^data:image\/(?:png|jpeg|gif|webp|bmp);base64,/i.test(src)) return null;
+    // ODR also emits this fallback for images that load successfully.
+    if (copy.alt === "Error: image not found or unsupported") {
+      const imageLabel = viewerText("image", "이미지");
+      copy.addEventListener("load", () => { copy.alt = imageLabel; }, { once: true });
+    }
     copy.src = src;
   }
   for (const child of node.childNodes) {

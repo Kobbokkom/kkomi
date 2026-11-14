@@ -107,6 +107,8 @@ globalThis.openDocument = async (extension, localizedStrings) => {
     if (error?.name === 'AbortError' && error.message === 'Password cancelled') return;
     if (error?.cause === 'hwpPageLimit') {
       report('error', 'HWP와 HWPX 문서는 2,000쪽까지 열 수 있습니다.');
+    } else if (error?.cause === 'officeRenderTimeout') {
+      report('error', '문서를 여는 데 시간이 너무 오래 걸렸습니다. 다시 열어 주세요.');
     } else if (imageTypes.has(extension)) {
       report('error', '이미지를 열 수 없습니다. 손상되었거나 지원하지 않는 형식일 수 있습니다.');
     } else if (/password|encrypted|암호/i.test(String(error))) {

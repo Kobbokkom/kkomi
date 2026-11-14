@@ -799,36 +799,37 @@ class _HomeSummary extends StatelessWidget {
                     builder: (context, opens, _) {
                       final progress = min(opens / 100, 1.0);
                       return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 4,
                             children: [
-                              Expanded(
-                                child: Wrap(
-                                  spacing: 8,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Text(
-                                      t('주간 열람'),
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF616161),
-                                      ),
+                              Wrap(
+                                spacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    t('주간 열람'),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF616161),
                                     ),
-                                    Text(
-                                      t(
-                                        reset == 1 ? '1일 후 초기화' : '{n}일 후 초기화',
-                                      ).replaceAll('{n}', '$reset'),
-                                      style: const TextStyle(
-                                        color: _muted,
-                                        fontSize: 11,
-                                      ),
+                                  ),
+                                  Text(
+                                    t(
+                                      reset == 1 ? '1일 후 초기화' : '{n}일 후 초기화',
+                                    ).replaceAll('{n}', '$reset'),
+                                    style: const TextStyle(
+                                      color: _muted,
+                                      fontSize: 11,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
                               Text(
                                 '${formatNumber(opens.toInt())} / ∞',
                                 style: const TextStyle(

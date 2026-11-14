@@ -110,6 +110,38 @@ sys.stdout.buffer.write(result.getvalue())
   await print(1, 56, false);
   assert.deepEqual(externalRequests, []);
   console.log('PASS ordinary text selection and four PPTX PDF page sizes');
+
+  await page.route('**/pptx-worker.js', route =>
+    route.fulfill({ contentType: 'text/javascript', body: 'self.onmessage = () => {}' }));
+  await page.clock.install();
+  await page.goto(`${origin}/assets/viewer.html`);
+  await page.evaluate(() => {
+    const terminate = Worker.prototype.terminate;
+    Worker.prototype.terminate = function () {
+      events.push({ event: 'workerTerminated' });
+      return terminate.call(this);
+    };
+  });
+  const workerLoaded = page.waitForResponse('**/pptx-worker.js');
+  await page.evaluate(() => { void openDocument('pptx'); });
+  await workerLoaded;
+  await page.clock.fastForward(25000);
+  await page.waitForFunction(() => events.some(({ event }) => event === 'error'));
+  assert.deepEqual(await page.evaluate(() => events.slice(1)), [
+    { event: 'workerTerminated' },
+    { event: 'error', value: '문서를 여는 데 시간이 너무 오래 걸렸습니다. 다시 열어 주세요.' },
+  ]);
+  await page.clock.fastForward(30000);
+  assert.equal(await page.evaluate(() => events.length), 3);
+
+  await page.unroute('**/pptx-worker.js');
+  documentBytes = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+  await page.goto(`${origin}/assets/viewer.html`);
+  await page.evaluate(() => openDocument('pptx'));
+  assert.deepEqual(await page.evaluate(() => events.slice(1)), [
+    { event: 'error', value: '문서를 읽을 수 없습니다. 손상되었거나 지원하지 않는 형식일 수 있습니다.' },
+  ]);
+  console.log('PASS Office timeout terminates the worker and reports a distinct error');
 } finally {
   await browser?.close();
   server.closeAllConnections();

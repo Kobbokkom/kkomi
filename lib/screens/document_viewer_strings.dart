@@ -308,6 +308,17 @@ const viewerStrings = <String, List<String>>{
     'Não foi possível ler o arquivo. Selecione-o novamente.',
     'File tidak dapat dibaca. Pilih lagi file tersebut.',
   ],
+  '문서를 여는 데 시간이 너무 오래 걸렸습니다. 다시 열어 주세요.': [
+    'Opening the document took too long. Try opening it again.',
+    '文書を開くのに時間がかかりすぎました。もう一度開いてください。',
+    '打开文档超时，请重新打开。',
+    '開啟文件逾時，請重新開啟。',
+    'El documento tardó demasiado en abrirse. Intenta abrirlo de nuevo.',
+    'L’ouverture du document a pris trop de temps. Essayez de le rouvrir.',
+    'Das Öffnen des Dokuments hat zu lange gedauert. Versuche, es erneut zu öffnen.',
+    'O documento demorou demais para abrir. Tente abri-lo novamente.',
+    'Membuka dokumen memakan waktu terlalu lama. Coba buka lagi.',
+  ],
   '문서를 읽을 수 없습니다. 손상되었거나 지원하지 않는 형식일 수 있습니다.': [
     'Couldn’t read the document. It may be damaged or in an unsupported format.',
     '書類を読み込めません。ファイルが破損しているか、対応していない形式の可能性があります。',

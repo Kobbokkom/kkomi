@@ -72,6 +72,8 @@ class _MyAppState extends State<MyApp> {
     localeListResolutionCallback: resolveLocale,
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     theme: ThemeData(
+      fontFamily: 'Pretendard',
+      fontFamilyFallback: const ['Noto Sans CJK'],
       colorScheme: ColorScheme.fromSeed(
         seedColor: accent,
         primary: accent,
