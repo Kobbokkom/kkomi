@@ -368,9 +368,19 @@ def run(device):
                 assert "찾아야 할 구절" in pages[6], pages[6]
                 print("PASS 11-page HWP PDF with searchable Korean text", flush=True)
             device.has("1 / 11")
-        if name in ("office-sheets.xlsx", "office-slides.pptx"):
+        if name == "office-sheets.xlsx":
             device.tap("문서 메뉴")
-            export_pdf(device, f"kkomi-e2e-{name.removeprefix('office-').split('.')[0]}-export")
+            export_pdf(device, "kkomi-e2e-sheets-export")
+            device.has("1 / 2")
+        if name == "office-slides.pptx":
+            device.tap("문서 메뉴")
+            with tempfile.TemporaryDirectory() as directory:
+                pdf = Path(directory) / "slides.pdf"
+                export_pdf(device, "kkomi-e2e-slides-export", local_copy=pdf)
+                text = subprocess.check_output(["pdftotext", str(pdf), "-"], encoding="utf-8")
+                pages = text.removesuffix("\f").split("\f")
+                assert len(pages) == 2, len(pages)
+                assert "Office slide one" in pages[0] and "Office slide two" in pages[1], text
             device.has("1 / 2")
         if name in ("long.txt", "long.csv"):
             device.tap("검색")

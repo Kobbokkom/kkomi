@@ -64,6 +64,7 @@
     .hwp-print-document { display: none; }
     @media print {
       @page kkomi-hwp { margin: 0; }
+      html { min-width: var(--office-print-width, 0px); }
       body { background: white; }
       #viewer, .other-document-page { padding: 0; margin: 0; box-shadow: none; }
       .office-slide { width: 100%; }

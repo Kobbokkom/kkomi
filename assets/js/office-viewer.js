@@ -276,6 +276,8 @@ export async function officePages(extension, bytes, requestPassword, reportPrint
   const sizes = new Map();
   let reportedPrintSize = false;
   globalThis.fitOfficeSlides = (width, height) => {
+    // WebKit may otherwise paginate a wide slide using a narrower print layout.
+    document.documentElement.style.setProperty("--office-print-width", `${Math.ceil(width)}px`);
     for (const [slide, size] of sizes) {
       slide.style.setProperty("--office-print-scale", String(Math.min(1, width / size.width, height / size.height)));
     }

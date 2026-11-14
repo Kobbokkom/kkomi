@@ -363,7 +363,8 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
       let renderer = ViewerPrintRenderer(paper: paper)
       renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
       let count = renderer.numberOfPages
-      guard (1...2000).contains(count), !isHwp || count == pageCount else { throw URLError(.cannotDecodeContentData) }
+      guard (1...2000).contains(count), !(isHwp || isSlide) || count == pageCount
+      else { throw URLError(.cannotDecodeContentData) }
       renderer.prepare(forDrawingPages: NSRange(location: 0, length: count))
       try UIGraphicsPDFRenderer(bounds: renderer.paperRect).writePDF(to: output) { context in
         for page in 0..<count {
