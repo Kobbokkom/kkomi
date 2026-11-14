@@ -141,3 +141,5 @@ globalThis.findInDocument = async (query, request) => {
     if (request === searchRequest) report('matches', { request, count: 0 });
   }
 };
+
+report('viewerReady');

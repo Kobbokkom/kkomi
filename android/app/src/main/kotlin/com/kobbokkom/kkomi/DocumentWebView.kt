@@ -59,6 +59,8 @@ private class DocumentWebView(
     private val webView = WebView(context)
     private var rendererGone = false
     private val handler = Handler(Looper.getMainLooper())
+    private var startupPending = false
+    private val startupTimeout = Runnable { failStartup() }
     private var hwpPrintResult: MethodChannel.Result? = null
     private var printing = false
     private var hwpCanPrint = false
@@ -116,23 +118,13 @@ private class DocumentWebView(
                 return loader.shouldInterceptRequest(url) ?: emptyResponse(404, "Not found")
             }
 
-            override fun onPageFinished(view: WebView, url: String) {
-                if (url == VIEWER_URL) {
-                    val argument = JSONObject.quote(extension)
-                    view.evaluateJavascript(
-                        "typeof window.openDocument === 'function' && (window.openDocument($argument), true)"
-                    ) { started ->
-                        if (started != "true") channel.invokeMethod("error", "문서 뷰어를 시작할 수 없습니다.")
-                    }
-                }
-            }
-
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (request.isForMainFrame) channel.invokeMethod("error", "문서 뷰어를 시작할 수 없습니다.")
+                if (request.isForMainFrame) failStartup()
             }
 
             override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                 rendererGone = true
+                finishStartup()
                 failHwpPrint("PDF를 준비할 수 없습니다.")
                 channel.invokeMethod("error", "문서 뷰어가 종료됐습니다. 파일을 다시 열어 주세요.")
                 (view.parent as? android.view.ViewGroup)?.removeView(view)
@@ -151,6 +143,14 @@ private class DocumentWebView(
                     return@addWebMessageListener
                 }
                 when (val event = data.optString("event")) {
+                    "viewerReady" -> if (finishStartup()) {
+                        val argument = JSONObject.quote(extension)
+                        webView.evaluateJavascript("window.openDocument($argument); true") { started ->
+                            if (started != "true" && !rendererGone) {
+                                channel.invokeMethod("error", "문서 뷰어를 시작할 수 없습니다.")
+                            }
+                        }
+                    }
                     "ready", "page" -> channel.invokeMethod(event, data.optInt("value"))
                     "error" -> channel.invokeMethod(event, data.optString("value"))
                     "password" -> channel.invokeMethod(event, data.optBoolean("value"))
@@ -192,8 +192,14 @@ private class DocumentWebView(
             }
             when (call.method) {
                 "start" -> {
-                    if (canReport) webView.loadUrl(VIEWER_URL)
-                    else channel.invokeMethod("error", "Android System WebView를 업데이트한 뒤 다시 열어 주세요.")
+                    if (canReport) {
+                        handler.removeCallbacks(startupTimeout)
+                        startupPending = true
+                        handler.postDelayed(startupTimeout, 10_000L)
+                        webView.loadUrl(VIEWER_URL)
+                    } else {
+                        channel.invokeMethod("error", "Android System WebView를 업데이트한 뒤 다시 열어 주세요.")
+                    }
                 }
                 "find" -> {
                     val query = JSONObject.quote(call.argument<String>("query").orEmpty())
@@ -342,10 +348,22 @@ private class DocumentWebView(
         result.error("print", message, null)
     }
 
+    private fun finishStartup(): Boolean {
+        if (!startupPending) return false
+        startupPending = false
+        handler.removeCallbacks(startupTimeout)
+        return true
+    }
+
+    private fun failStartup() {
+        if (finishStartup()) channel.invokeMethod("error", "문서 뷰어를 시작할 수 없습니다.")
+    }
+
     override fun getView() = webView
 
     override fun dispose() {
         channel.setMethodCallHandler(null)
+        finishStartup()
         failHwpPrint("PDF 준비가 취소됐습니다.")
         if (!rendererGone) {
             rendererGone = true

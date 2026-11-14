@@ -151,6 +151,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   private let name: String
   private let hasFile: Bool
   private var pageCount = 0
+  private var startupTimeout: DispatchWorkItem?
   private var canPrintHwp = false
   private var slidePaper: CGSize?
   private var printResult: FlutterResult?
@@ -187,6 +188,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
 
   deinit {
     channel.setMethodCallHandler(nil)
+    startupTimeout?.cancel()
     printTimeout?.cancel()
     if let exportDirectory { try? FileManager.default.removeItem(at: exportDirectory) }
   }
@@ -196,8 +198,15 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "start":
-      if hasFile { webView.load(URLRequest(url: viewerURL)) }
-      else { channel.invokeMethod("error", arguments: "파일을 읽을 수 없습니다. 다시 선택해 주세요.") }
+      if hasFile {
+        startupTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in self?.failStartup() }
+        startupTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+        webView.load(URLRequest(url: viewerURL))
+      } else {
+        channel.invokeMethod("error", arguments: "파일을 읽을 수 없습니다. 다시 선택해 주세요.")
+      }
     case "find":
       let arguments = call.arguments as? [String: Any]
       let query = json(arguments?["query"] as? String ?? "")
@@ -235,29 +244,39 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
     decisionHandler(allowed ? .allow : .cancel)
   }
 
-  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    webView.evaluateJavaScript("typeof window.openDocument === 'function' && (window.openDocument(\(json(fileExtension))), true)") { [weak self] value, _ in
-      if value as? Bool != true {
-        self?.channel.invokeMethod("error", arguments: "문서 뷰어를 시작할 수 없습니다.")
-      }
-    }
+  private func failStartup() {
+    guard let startupTimeout else { return }
+    startupTimeout.cancel()
+    self.startupTimeout = nil
+    channel.invokeMethod("error", arguments: "문서 뷰어를 시작할 수 없습니다.")
   }
 
   func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-    channel.invokeMethod("error", arguments: "문서 뷰어를 시작할 수 없습니다.")
+    failStartup()
   }
 
   func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-    channel.invokeMethod("error", arguments: "문서 뷰어를 시작할 수 없습니다.")
+    failStartup()
   }
 
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+    startupTimeout?.cancel()
+    startupTimeout = nil
     completePrint(error: "PDF를 준비할 수 없습니다.")
     channel.invokeMethod("error", arguments: "문서 뷰어가 종료됐습니다. 파일을 다시 열어 주세요.")
   }
 
   fileprivate func receive(_ event: String, _ value: Any?) {
     switch event {
+    case "viewerReady":
+      guard let startupTimeout else { return }
+      startupTimeout.cancel()
+      self.startupTimeout = nil
+      webView.evaluateJavaScript("void window.openDocument(\(json(fileExtension)))") { [weak self] _, error in
+        if error != nil {
+          self?.channel.invokeMethod("error", arguments: "문서 뷰어를 시작할 수 없습니다.")
+        }
+      }
     case "ready":
       pageCount = value as? Int ?? 0
       channel.invokeMethod(event, arguments: pageCount)
