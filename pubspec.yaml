@@ -37,7 +37,6 @@ flutter:
     - assets/fonts/NotoSansCJK-OFL.txt
     - tools/hwp-policy/THIRD_PARTY_NOTICES.txt
     - tools/odr/7.7.0.patch
-    - tools/odr/build.sh
   fonts:
     - family: Pretendard
       fonts:

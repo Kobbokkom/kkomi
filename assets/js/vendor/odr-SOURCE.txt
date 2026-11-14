@@ -4,6 +4,7 @@ Upstream source: https://github.com/opendocument-app/OpenDocument.core/tree/fae7
 Modified source: the Flutter app bundle includes tools/odr/7.7.0.patch under the MPL-2.0.
 Apply it to the revision above to obtain the corresponding source. It adds bounded workbook metadata and fixes ODS cell wrapping.
 Third-party notices: odr-THIRD-PARTY-NOTICES.zip.
-Build: bash tools/odr/build.sh with Conan 2, CMake, and Ninja (Emscripten 3.1.73 via upstream profile).
+Build script: https://github.com/Kobbokkom/kkomi/blob/d23c41e7a3dafd9dd8371d8355c02fd2ed42d408/tools/odr/build.sh
+Run bash tools/odr/build.sh from that checkout with Conan 2, CMake, and Ninja (Emscripten 3.1.73 via upstream profile).
 For a host compiler newer than Conan recognizes, set ODR_BUILD_PROFILE to an absolute compatible Conan profile.
 The built index.js is named odr-7.7.0.mjs here.
