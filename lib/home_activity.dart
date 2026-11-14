@@ -33,13 +33,6 @@ class HomeActivity {
     return _lastUse == day || _lastUse == day - 1 ? _streak : 0;
   }
 
-  int daysUntilReset(DateTime now) {
-    final local = now.toLocal();
-    final startOfDay = DateTime(local.year, local.month, local.day);
-    final days = DateTime.daysPerWeek + DateTime.monday - local.weekday;
-    return local.isAtSameMomentAs(startOfDay) ? days : days - 1;
-  }
-
   void recordUse(DateTime now) {
     final day = _calendarDay(now.toLocal());
     final lastUse = _lastUse;

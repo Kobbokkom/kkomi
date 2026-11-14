@@ -10,8 +10,6 @@ void main() {
     activity.recordOpen(sunday, pages: 4);
     expect(activity.weeklyOpens(sunday), 1);
     expect(activity.weeklyPages(sunday), 4);
-    expect(activity.daysUntilReset(DateTime(2026, 11, 13, 19)), 2);
-    expect(activity.daysUntilReset(sunday), 0);
     expect(activity.weeklyOpens(monday), 0);
     expect(activity.weeklyPages(monday), 0);
 

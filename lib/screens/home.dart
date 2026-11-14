@@ -774,7 +774,6 @@ class _HomeSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reset = activity.daysUntilReset(now);
     String t(String korean) => translate(context, korean, homeStrings);
     final formatNumber = MaterialLocalizations.of(context).formatDecimal;
 
@@ -807,28 +806,13 @@ class _HomeSummary extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 4,
                             children: [
-                              Wrap(
-                                spacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Text(
-                                    t('주간 열람'),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF616161),
-                                    ),
-                                  ),
-                                  Text(
-                                    t(
-                                      reset == 1 ? '1일 후 초기화' : '{n}일 후 초기화',
-                                    ).replaceAll('{n}', '$reset'),
-                                    style: const TextStyle(
-                                      color: _muted,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                t('주간 열람'),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF616161),
+                                ),
                               ),
                               Text(
                                 '${formatNumber(opens.toInt())} / ∞',
