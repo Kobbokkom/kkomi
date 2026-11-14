@@ -1,5 +1,6 @@
 // @rhwp/core 0.9.0, bundled with its license and notices.
 import init, { HwpDocument } from './rhwp.js';
+import { viewerText } from './viewer-strings.js';
 
 const maxRenderedPages = 5;
 const maxPageSvgBytes = 24 * 1024 * 1024;
@@ -107,7 +108,7 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
 
     function pageImage(index, url) {
         const image = document.createElement('img');
-        image.alt = `${index + 1}쪽`;
+        image.alt = viewerText('page', '{page}쪽', index + 1);
         // SVG image mode prevents document links, script and external asset loads.
         image.src = url;
         return image;
@@ -249,7 +250,7 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
         if (next === undefined) return;
         renderPage(next).catch(() => {
             failed.add(next);
-            pages[next].textContent = `${next + 1}쪽을 표시할 수 없습니다.`;
+            pages[next].textContent = viewerText('pageFailed', '{page}쪽을 표시할 수 없습니다.', next + 1);
         });
         scheduleRefresh();
     }

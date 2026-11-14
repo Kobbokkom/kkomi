@@ -38,6 +38,7 @@
                 <data android:mimeType="application/hwp"/>
                 <data android:mimeType="application/hwpx"/>
                 <data android:mimeType="application/x-hwpx"/>
+                <data android:mimeType="application/hwp+zip"/>
                 <data android:mimeType="application/haansofthwp"/>
                 <data android:mimeType="application/vnd.hancom.hwp"/>
                 <data android:mimeType="application/vnd.hancom.hwpx"/>

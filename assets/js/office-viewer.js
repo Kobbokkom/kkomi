@@ -1,3 +1,5 @@
+import { viewerText } from './viewer-strings.js';
+
 const tags = new Set((
   "div span x-p x-s p h1 h2 h3 h4 h5 h6 table thead tbody tfoot tr th td col colgroup " +
   "img a br wbr b i u s strong em sub sup ul ol li hr section article blockquote pre code " +
@@ -129,7 +131,7 @@ function officePage(kind, sheet, contents, view, resize) {
   if (view?.sheetCut) {
     const warning = document.createElement("p");
     warning.className = "office-cut";
-    warning.textContent = "미리보기에 표의 일부만 표시돼요.";
+    warning.textContent = viewerText("tablePreview", "미리보기에 표의 일부만 표시돼요.");
     shadow.append(warning);
   }
   if (kind !== "word" && !root.firstElementChild) throw new Error("표시할 페이지가 없어요.");

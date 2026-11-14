@@ -51,6 +51,7 @@ private val documentTypeAliases = mapOf(
     "application/hwp" to "hwp",
     "application/hwpx" to "hwpx",
     "application/x-hwpx" to "hwpx",
+    "application/hwp+zip" to "hwpx",
     "application/vnd.hancom.hwpx" to "hwpx",
     "image/x-bmp" to "bmp",
     "image/x-ms-bmp" to "bmp",
@@ -299,7 +300,7 @@ class MainActivity : FlutterActivity() {
         }
         pdfSave = uri to result
         try {
-            val base = name.substringBeforeLast('.').ifBlank { "문서" }
+            val base = name.substringBeforeLast('.').ifBlank { "Kkomi" }
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "application/pdf"
@@ -421,7 +422,7 @@ class MainActivity : FlutterActivity() {
             ?: documentTypes.entries.firstOrNull { it.value == type }?.key
             ?: throw DocumentException("지원하지 않는 파일 형식입니다.")
         if (size != null && size > MAX_DOCUMENT_BYTES) throw DocumentException("64MB 이하의 문서를 열 수 있습니다.")
-        val displayName = name?.takeIf(String::isNotBlank) ?: "문서.$extension"
+        val displayName = name?.takeIf(String::isNotBlank) ?: "Kkomi.$extension"
         val storedUri = if (uri.authority == "$packageName.documents") {
             uri
         } else {

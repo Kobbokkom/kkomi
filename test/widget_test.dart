@@ -12,11 +12,30 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 void main() {
+  testWidgets('언어 선택이 설정과 홈에 반영되고 저장된다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('설정'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('English').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
+    expect(await SharedPreferencesAsync().getString('app-language'), 'en');
+  });
+
   testWidgets('꼬미 홈에서 파일 열기와 최근 문서를 찾을 수 있다', (tester) async {
     SharedPreferences.setMockInitialValues({});
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pumpAndSettle();
 
     expect(find.text('홈'), findsOneWidget);
@@ -66,7 +85,7 @@ void main() {
       }),
     ]);
 
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pump();
     expect(find.text('50 / ∞'), findsNothing);
     await tester.pumpAndSettle();
@@ -111,7 +130,7 @@ void main() {
       throw PlatformException(code: 'restore-failed');
     });
 
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pumpAndSettle();
     expect(find.text('3 / ∞'), findsOneWidget);
     expect(await saved.getBool('prefer-system-viewer'), isFalse);
@@ -139,7 +158,7 @@ void main() {
     });
 
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pumpAndSettle();
     expect(find.text('3 / ∞'), findsOneWidget);
     expect(find.text('new.hwp'), findsOneWidget);
@@ -156,7 +175,7 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
     final saved = SharedPreferencesAsync();
 
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pumpAndSettle();
     expect(await saved.getString('home-reading-activity'), isNull);
 
@@ -165,7 +184,7 @@ void main() {
       'current_usage_v1': 4,
     });
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pumpAndSettle();
     expect(find.text('4 / ∞'), findsOneWidget);
     expect(await saved.getString('home-reading-activity'), isNotNull);
@@ -203,7 +222,7 @@ void main() {
       return null;
     });
 
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const MyApp(initialLanguage: 'ko'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('old.pdf'));
     await tester.pumpAndSettle();

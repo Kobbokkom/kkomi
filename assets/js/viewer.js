@@ -1,3 +1,5 @@
+import { setViewerStrings, viewerText } from './viewer-strings.js';
+
 const viewer = document.querySelector('#viewer');
 const report = (event, value) => globalThis.Kkomi?.postMessage(JSON.stringify({ event, value }));
 let documentView;
@@ -22,7 +24,7 @@ async function openImage(response, extension) {
   const bytes = await response.arrayBuffer();
   const source = URL.createObjectURL(new Blob([bytes], { type }));
   const image = new Image();
-  image.alt = '이미지';
+  image.alt = viewerText('image', '이미지');
   image.draggable = false;
   image.src = source;
   try {
@@ -55,10 +57,11 @@ globalThis.submitPassword = (password) => {
   reply?.(password);
 };
 
-globalThis.openDocument = async (extension) => {
+globalThis.openDocument = async (extension, localizedStrings) => {
   if (opening) return;
   opening = true;
   try {
+    setViewerStrings(localizedStrings);
     const response = await fetch('/document');
     if (!response.ok) {
       report('error', '파일을 읽을 수 없습니다. 다시 선택해 주세요.');

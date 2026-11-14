@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:flutter/services.dart';
 
 import '../ads.dart';
 import '../documents.dart';
+import '../localization.dart';
+import 'document_viewer_strings.dart';
 
 class DocumentViewer extends StatefulWidget {
   const DocumentViewer({
@@ -45,6 +48,13 @@ class _DocumentViewerState extends State<DocumentViewer> {
   bool get _bottomSearch =>
       _hasPageToolbar || widget.document.extension == 'docx';
 
+  String _text(String key) => translate(context, key, viewerStrings);
+
+  String _errorText(String? message, String fallback) {
+    if (viewerStrings.containsKey(message)) return _text(message!);
+    return nativeMessage(context, message, _text(fallback));
+  }
+
   Future<void> _saveConvertedPdf() async {
     try {
       await documentsChannel.invokeMethod<void>('saveConvertedPdf', {
@@ -54,7 +64,9 @@ class _DocumentViewerState extends State<DocumentViewer> {
     } on PlatformException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? 'PDF를 저장할 수 없습니다.')),
+          SnackBar(
+            content: Text(_errorText(error.message, 'PDF를 저장할 수 없습니다.')),
+          ),
         );
       }
     }
@@ -68,7 +80,9 @@ class _DocumentViewerState extends State<DocumentViewer> {
     } on PlatformException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? 'PDF를 저장할 수 없습니다.')),
+          SnackBar(
+            content: Text(_errorText(error.message, 'PDF를 저장할 수 없습니다.')),
+          ),
         );
       }
     } finally {
@@ -148,7 +162,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('문서 암호'),
+        title: Text(_text('문서 암호')),
         content: TextField(
           autofocus: true,
           obscureText: true,
@@ -157,18 +171,18 @@ class _DocumentViewerState extends State<DocumentViewer> {
           onChanged: (value) => password = value,
           onSubmitted: (value) => Navigator.pop(dialogContext, value),
           decoration: InputDecoration(
-            labelText: '암호',
-            errorText: incorrect ? '암호가 올바르지 않습니다.' : null,
+            labelText: _text('암호'),
+            errorText: incorrect ? _text('암호가 올바르지 않습니다.') : null,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('취소'),
+            child: Text(_text('취소')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, password),
-            child: const Text('열기'),
+            child: Text(_text('열기')),
           ),
         ],
       ),
@@ -191,7 +205,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
     } on PlatformException catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message ?? '파일을 공유할 수 없습니다.')),
+          SnackBar(content: Text(_errorText(error.message, '파일을 공유할 수 없습니다.'))),
         );
       }
     }
@@ -210,7 +224,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
         }
 
         return AlertDialog(
-          title: const Text('페이지 이동'),
+          title: Text(_text('페이지 이동')),
           content: TextField(
             controller: field,
             keyboardType: TextInputType.number,
@@ -222,9 +236,9 @@ class _DocumentViewerState extends State<DocumentViewer> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('취소'),
+              child: Text(_text('취소')),
             ),
-            FilledButton(onPressed: submit, child: const Text('이동')),
+            FilledButton(onPressed: submit, child: Text(_text('이동'))),
           ],
         );
       },
@@ -252,7 +266,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
     onSubmitted: (_) => _moveMatch(1),
     textInputAction: TextInputAction.search,
     decoration: InputDecoration(
-      hintText: outlined ? '검색...' : '문서 검색',
+      hintText: _text(outlined ? '검색...' : '문서 검색'),
       isDense: outlined,
       contentPadding: outlined
           ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
@@ -272,12 +286,12 @@ class _DocumentViewerState extends State<DocumentViewer> {
   List<Widget> _searchActions() => [
     IconButton(
       onPressed: (_matches ?? 0) > 0 ? () => _moveMatch(-1) : null,
-      tooltip: '이전 검색 결과',
+      tooltip: _text('이전 검색 결과'),
       icon: const Icon(Icons.expand_less),
     ),
     IconButton(
       onPressed: (_matches ?? 0) > 0 ? () => _moveMatch(1) : null,
-      tooltip: '다음 검색 결과',
+      tooltip: _text('다음 검색 결과'),
       icon: const Icon(Icons.expand_more),
     ),
     IconButton(
@@ -288,7 +302,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
               _search.clear();
               _find('');
             },
-      tooltip: '검색 닫기',
+      tooltip: _text('검색 닫기'),
       icon: const Icon(Icons.close),
     ),
   ];
@@ -314,8 +328,10 @@ class _DocumentViewerState extends State<DocumentViewer> {
                           child: Semantics(
                             liveRegion: true,
                             label: count == 0
-                                ? '검색 결과 없음'
-                                : '검색 결과 $_currentMatch / $count',
+                                ? _text('검색 결과 없음')
+                                : _text('검색 결과 {current} / {count}')
+                                      .replaceAll('{current}', '$_currentMatch')
+                                      .replaceAll('{count}', '$count'),
                             excludeSemantics: true,
                             child: Text(
                               count == 0 ? '0 / 0' : '$_currentMatch / $count',
@@ -331,7 +347,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
-                      tooltip: '이전 페이지',
+                      tooltip: _text('이전 페이지'),
                       onPressed: _page > 0
                           ? () => unawaited(_invoke('page', _page - 1))
                           : null,
@@ -349,7 +365,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
                       child: Text('${_page + 1} / $_pageCount'),
                     ),
                     IconButton(
-                      tooltip: '다음 페이지',
+                      tooltip: _text('다음 페이지'),
                       onPressed: _page + 1 < _pageCount
                           ? () => unawaited(_invoke('page', _page + 1))
                           : null,
@@ -357,7 +373,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
                     ),
                     const SizedBox(width: 4),
                     IconButton(
-                      tooltip: '검색',
+                      tooltip: _text('검색'),
                       onPressed: _toggleSearch,
                       icon: const Icon(Icons.search),
                     ),
@@ -375,6 +391,18 @@ class _DocumentViewerState extends State<DocumentViewer> {
     const creationParamsCodec = StandardMessageCodec();
     final creationParams = {
       ...widget.document.toMap(),
+      'viewerStrings': jsonEncode({
+        'language': languageOf(context),
+        'title': _text('꼬미 문서 뷰어'),
+        'document': _text('문서'),
+        'image': _text('이미지'),
+        'page': _text('{page}쪽'),
+        'pageFailed': _text('{page}쪽을 표시할 수 없습니다.'),
+        'pdfPageFailed': _text('이 페이지를 표시할 수 없어요.'),
+        'tablePreview': _text('미리보기에 표의 일부만 표시돼요.'),
+        'pdfPreparationFailed': _text('PDF를 준비할 수 없습니다.'),
+        'slideSize': _text('슬라이드 크기'),
+      }),
       if (widget.convertedPdf case final uri?) ...{
         'uri': uri,
         'extension': 'pdf',
@@ -408,7 +436,7 @@ class _DocumentViewerState extends State<DocumentViewer> {
             if (ready && !_bottomSearch && !widget.document.isImage)
               IconButton(
                 onPressed: _toggleSearch,
-                tooltip: '검색',
+                tooltip: _text('검색'),
                 icon: const Icon(Icons.search),
               ),
             if (directSave)
@@ -420,11 +448,20 @@ class _DocumentViewerState extends State<DocumentViewer> {
                             ? _saveConvertedPdf()
                             : _printPdf(),
                       ),
-                tooltip: 'PDF로 저장',
-                icon: const Icon(Icons.download_outlined),
+                tooltip: _text('PDF로 저장'),
+                icon: const Padding(
+                  padding: EdgeInsetsDirectional.only(start: 8),
+                  child: Icon(Icons.vertical_align_bottom_rounded, size: 22),
+                ),
               ),
             PopupMenuButton<String>(
-              tooltip: '문서 메뉴',
+              icon: directSave
+                  ? Padding(
+                      padding: const EdgeInsetsDirectional.only(end: 8),
+                      child: Icon(Icons.adaptive.more),
+                    )
+                  : null,
+              tooltip: _text('문서 메뉴'),
               onSelected: (action) {
                 switch (action) {
                   case 'search':
@@ -446,17 +483,17 @@ class _DocumentViewerState extends State<DocumentViewer> {
               },
               itemBuilder: (_) => [
                 if (ready && !widget.document.isImage && !_searching)
-                  const PopupMenuItem(value: 'search', child: Text('검색')),
+                  PopupMenuItem(value: 'search', child: Text(_text('검색'))),
                 if (ready && _pageCount > 1)
-                  const PopupMenuItem(value: 'page', child: Text('페이지 이동')),
+                  PopupMenuItem(value: 'page', child: Text(_text('페이지 이동'))),
                 if (ready && widget.document.isImage)
                   PopupMenuItem(
                     value: 'imageFit',
-                    child: Text(_imageFit ? '원본 크기' : '화면에 맞추기'),
+                    child: Text(_text(_imageFit ? '원본 크기' : '화면에 맞추기')),
                   ),
                 if (canSave)
-                  const PopupMenuItem(value: 'print', child: Text('PDF로 저장')),
-                const PopupMenuItem(value: 'share', child: Text('공유')),
+                  PopupMenuItem(value: 'print', child: Text(_text('PDF로 저장'))),
+                PopupMenuItem(value: 'share', child: Text(_text('공유'))),
               ],
             ),
           ],
@@ -471,8 +508,10 @@ class _DocumentViewerState extends State<DocumentViewer> {
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(switch (_matches) {
-                0 => '검색 결과가 없어요',
-                _ => '검색 결과 $_matches페이지',
+                0 => _text('검색 결과가 없어요'),
+                _ => _text(
+                  '검색 결과 {count}페이지',
+                ).replaceAll('{count}', '$_matches'),
               }, style: Theme.of(context).textTheme.bodySmall),
             ),
           Expanded(
@@ -498,12 +537,15 @@ class _DocumentViewerState extends State<DocumentViewer> {
                     color: Theme.of(context).scaffoldBackgroundColor,
                     child: Center(
                       child: _error == null
-                          ? const CircularProgressIndicator(
-                              semanticsLabel: '문서 열기',
+                          ? CircularProgressIndicator(
+                              semanticsLabel: _text('문서 열기'),
                             )
                           : Padding(
                               padding: const EdgeInsets.all(24),
-                              child: Text(_error!, textAlign: TextAlign.center),
+                              child: Text(
+                                _errorText(_error, '문서 뷰어를 열 수 없습니다.'),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                     ),
                   ),

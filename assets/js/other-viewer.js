@@ -1,3 +1,5 @@
+import { viewerText } from './viewer-strings.js';
+
 const maxSheetRows = 1000;
 const maxSheetColumns = 64;
 const vendor = new URL("./vendor/", import.meta.url);
@@ -187,7 +189,7 @@ async function pdfDocument(bytes, viewer, reportPage, requestPassword) {
   const firstView = firstPage.getViewport({ scale: 1 });
   const pages = Array.from({ length: doc.numPages }, (_, index) => {
     const page = element("section", "other-pdf-page");
-    page.setAttribute("aria-label", `${index + 1} 페이지`);
+    page.setAttribute("aria-label", viewerText("page", "{page}쪽", index + 1));
     page.style.aspectRatio = `${firstView.width} / ${firstView.height}`;
     return page;
   });
@@ -321,7 +323,7 @@ async function pdfDocument(bytes, viewer, reportPage, requestPassword) {
       page.cleanup();
     } catch (error) {
       if (wanted.has(index) && error.name !== "RenderingCancelledException") {
-        target.replaceChildren(element("p", "other-note", "이 페이지를 표시할 수 없어요."));
+        target.replaceChildren(element("p", "other-note", viewerText("pdfPageFailed", "이 페이지를 표시할 수 없어요.")));
       }
     } finally {
       renders.delete(index);
@@ -424,7 +426,7 @@ function appendTable(page, rows, truncated) {
   const scroller = element("div", "other-table");
   scroller.append(table);
   page.append(scroller);
-  if (truncated) page.append(element("p", "other-note", "미리보기에 표의 일부만 표시돼요."));
+  if (truncated) page.append(element("p", "other-note", viewerText("tablePreview", "미리보기에 표의 일부만 표시돼요.")));
 }
 
 async function commaSeparated(bytes) {

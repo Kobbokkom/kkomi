@@ -45,6 +45,7 @@ internal class DocumentWebViewFactory(private val messenger: BinaryMessenger) :
             Uri.parse(document["uri"] as String),
             document["extension"] as String,
             document["name"] as String,
+            document["viewerStrings"] as? String ?: "{}",
         )
     }
 }
@@ -55,8 +56,10 @@ private class DocumentWebView(
     private val documentUri: Uri,
     private val extension: String,
     private val name: String,
+    private val viewerStrings: String,
 ) : PlatformView {
     private val webView = WebView(context)
+    private val labels by lazy { runCatching { JSONObject(viewerStrings) }.getOrNull() }
     private var rendererGone = false
     private val handler = Handler(Looper.getMainLooper())
     private var startupPending = false
@@ -144,8 +147,9 @@ private class DocumentWebView(
                 }
                 when (val event = data.optString("event")) {
                     "viewerReady" -> if (finishStartup()) {
-                        val argument = JSONObject.quote(extension)
-                        webView.evaluateJavascript("window.openDocument($argument); true") { started ->
+                        val fileType = JSONObject.quote(extension)
+                        val localizedStrings = JSONObject.quote(viewerStrings)
+                        webView.evaluateJavascript("window.openDocument($fileType, $localizedStrings); true") { started ->
                             if (started != "true" && !rendererGone) {
                                 channel.invokeMethod("error", "문서 뷰어를 시작할 수 없습니다.")
                             }
@@ -171,7 +175,8 @@ private class DocumentWebView(
                         val width = dimensions?.optInt("width") ?: 0
                         val height = dimensions?.optInt("height") ?: 0
                         if (extension in setOf("ppt", "pptx") && width in 1000..40000 && height in 1000..40000) {
-                            slideMedia = PrintAttributes.MediaSize("kkomi-slide", "슬라이드 크기", width, height)
+                            val label = labels?.optString("slideSize", "슬라이드 크기") ?: "슬라이드 크기"
+                            slideMedia = PrintAttributes.MediaSize("kkomi-slide", label, width, height)
                         }
                     }
                     "matches" -> {
@@ -265,7 +270,7 @@ private class DocumentWebView(
     }
 
     private fun startPrint(attributes: PrintAttributes, fitSlides: Boolean = false, onFinish: () -> Unit = {}) {
-        val title = name.substringBeforeLast('.')
+        val title = name.substringBeforeLast('.').ifBlank { labels?.optString("document", "문서") ?: "문서" }
         val manager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
         val adapter = printAdapter(webView.createPrintDocumentAdapter(title), fitSlides) {
             printing = false
@@ -301,7 +306,9 @@ private class DocumentWebView(
             val height = (media.heightMils - margins.topMils - margins.bottomMils).coerceAtLeast(1) * 0.096
             webView.evaluateJavascript("window.fitOfficeSlides?.($width, $height)") {
                 if (signal.isCanceled) callback.onLayoutCancelled()
-                else if (rendererGone) callback.onLayoutFailed("PDF를 준비할 수 없습니다.")
+                else if (rendererGone) {
+                    callback.onLayoutFailed(labels?.optString("pdfPreparationFailed", "PDF를 준비할 수 없습니다."))
+                }
                 else delegate.onLayout(oldAttributes, newAttributes, signal, callback, extras)
             }
         }

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import 'localization.dart';
+
 const _androidBannerId = kReleaseMode
     ? String.fromEnvironment(
         'ANDROID_ADMOB_BANNER_ID',
@@ -32,7 +34,9 @@ bool _privacyFormOpen = false;
 Future<void> initializeAds() => _initialization ??= _initializeAds();
 
 Future<void> _initializeAds() async {
-  if (kIsWeb || _bannerId.isEmpty) {
+  if (kIsWeb ||
+      _bannerId.isEmpty ||
+      (kDebugMode && const bool.fromEnvironment('KKOMI_CAPTURE_SCREENSHOTS'))) {
     return;
   }
 
@@ -88,7 +92,21 @@ class AdPrivacyOptions extends StatelessWidget {
       builder: (context, required, _) => required
           ? ListTile(
               leading: const Icon(Icons.privacy_tip_outlined),
-              title: const Text('광고 개인정보 설정'),
+              title: Text(
+                translate(context, '광고 개인정보 설정', const {
+                  '광고 개인정보 설정': [
+                    'Ad privacy options',
+                    '広告のプライバシー設定',
+                    '广告隐私设置',
+                    '廣告隱私設定',
+                    'Privacidad de anuncios',
+                    'Confidentialité des annonces',
+                    'Datenschutz bei Werbung',
+                    'Privacidade de anúncios',
+                    'Privasi iklan',
+                  ],
+                }),
+              ),
               onTap: _showPrivacyOptions,
             )
           : const SizedBox.shrink(),

@@ -11,8 +11,10 @@ import '../ads.dart';
 import '../documents.dart';
 import '../docx_page_estimate.dart';
 import '../home_activity.dart';
+import '../home_strings.dart';
 import '../home_tips.dart';
 import '../legacy_preferences.dart';
+import '../localization.dart';
 import 'document_viewer.dart';
 
 const _muted = Color(0xFF716D63);
@@ -26,7 +28,10 @@ const _officeConverter = String.fromEnvironment('KKOMI_OFFICE_CONVERTER_URL');
 const _summaryAnimation = Duration(milliseconds: 1200);
 
 class Home extends StatefulWidget {
-  const Home({super.key});
+  const Home({super.key, this.language, this.onLanguageChanged});
+
+  final String? language;
+  final ValueChanged<String?>? onLanguageChanged;
 
   @override
   State<Home> createState() => _HomeState();
@@ -36,7 +41,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   bool get _hasDocumentAccess => Platform.isAndroid || Platform.isIOS;
 
   final _history = <Document>[];
-  final _tip = homeTips[Random().nextInt(homeTips.length)];
+  final _tipIndex = Random().nextInt(1 << 31);
   final _preferences = SharedPreferencesAsync();
   HomeActivity _activity = HomeActivity.decode(null);
   Future<void> _activityWrite = Future<void>.value();
@@ -51,6 +56,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Document? _active;
   Route<void>? _viewerRoute;
   Document? _pending;
+
+  String _t(String korean) => translate(context, korean, homeStrings);
 
   @override
   void initState() {
@@ -80,10 +87,10 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             restoreActivity: activityData == null,
           );
           if (legacy.historyRestoreFailed) {
-            _message('이전 앱의 최근 문서를 불러올 수 없습니다.');
+            _homeMessage('이전 앱의 최근 문서를 불러올 수 없습니다.');
           }
         } on PlatformException {
-          _message('이전 앱의 기록을 불러올 수 없습니다.');
+          _homeMessage('이전 앱의 기록을 불러올 수 없습니다.');
         }
       }
       if (!mounted) return;
@@ -124,7 +131,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         await _preferences.setBool(_systemViewerKey, migratedPreference);
       }
     } on PlatformException {
-      _message('최근 문서 기록을 불러올 수 없습니다.');
+      _homeMessage('최근 문서 기록을 불러올 수 없습니다.');
     } finally {
       if (mounted) {
         _loaded = true;
@@ -161,8 +168,14 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         fromIntent: true,
       );
     } else if (call.method == 'openError') {
-      _message(call.arguments as String);
+      _message(
+        nativeMessage(context, call.arguments as String?, '파일을 열 수 없습니다.'),
+      );
     }
+  }
+
+  void _homeMessage(String korean) {
+    if (mounted) _message(_t(korean));
   }
 
   void _message(String message) {
@@ -176,7 +189,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Future<void> _pick({bool photo = false}) async {
     if (_picking || !_loaded) return;
     if (!_hasDocumentAccess) {
-      _message('Android 또는 iOS에서 문서를 열 수 있습니다.');
+      _homeMessage('Android 또는 iOS에서 문서를 열 수 있습니다.');
       return;
     }
     setState(() => _picking = true);
@@ -188,7 +201,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         await _open(Document.fromMap(data), rememberImport: true);
       }
     } on PlatformException catch (error) {
-      _message(error.message ?? '파일을 열 수 없습니다.');
+      if (mounted) {
+        _message(nativeMessage(context, error.message, '파일을 열 수 없습니다.'));
+      }
     } finally {
       if (mounted) setState(() => _picking = false);
     }
@@ -310,19 +325,20 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final approved = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('서버에서 PDF로 변환할까요?'),
+          title: Text(_t('서버에서 PDF로 변환할까요?')),
           content: Text(
-            '원본 배치를 유지하기 위해 이 Office 문서를 '
-            '${Uri.parse(_officeConverter).host} 서버로 전송합니다.',
+            _t(
+              '원본 배치를 유지하기 위해 이 Office 문서를 {host} 서버로 전송합니다.',
+            ).replaceAll('{host}', Uri.parse(_officeConverter).host),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('기기에서 열기'),
+              child: Text(_t('기기에서 열기')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('서버에서 변환'),
+              child: Text(_t('서버에서 변환')),
             ),
           ],
         ),
@@ -334,7 +350,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         arguments,
       );
     } on PlatformException {
-      _message('서버 변환을 완료하지 못해 기기에서 엽니다.');
+      _homeMessage('서버 변환을 완료하지 못해 기기에서 엽니다.');
       return null;
     } finally {
       if (mounted && _converting) setState(() => _converting = false);
@@ -366,7 +382,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       try {
         await _preferences.setString(_activityKey, snapshot);
       } on PlatformException {
-        _message('열람 기록을 저장할 수 없습니다.');
+        _homeMessage('열람 기록을 저장할 수 없습니다.');
       }
     });
   }
@@ -408,7 +424,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           await _preferences.remove(_legacyHistoryPendingKey);
         }
       } on PlatformException {
-        _message('최근 문서 기록을 저장할 수 없습니다.');
+        _homeMessage('최근 문서 기록을 저장할 수 없습니다.');
       }
     });
   }
@@ -418,45 +434,77 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       context: context,
       useSafeArea: true,
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('설정', style: Theme.of(context).textTheme.titleLarge),
-                    IconButton(
-                      tooltip: '닫기',
-                      onPressed: () => Navigator.pop(sheetContext),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('시스템 뷰어 선호'),
-                  subtitle: Text(
-                    Platform.isIOS
-                        ? 'PDF·Office·텍스트를 가능한 경우 iOS 미리보기로 열기'
-                        : 'HWP 계열과 사진을 제외한 문서는 가능한 경우 시스템 앱으로 열기',
+        builder: (context, setSheetState) {
+          String t(String korean) => translate(context, korean, homeStrings);
+
+          return SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          t('설정'),
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: t('닫기'),
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
                   ),
-                  value: _preferSystem,
-                  onChanged: (value) {
-                    setSheetState(() => _preferSystem = value ?? false);
-                    unawaited(
-                      _preferences.setBool(_systemViewerKey, _preferSystem),
-                    );
-                  },
-                ),
-                const AdPrivacyOptions(),
-              ],
+                  if (widget.onLanguageChanged != null)
+                    DropdownButtonFormField<String>(
+                      initialValue: widget.language ?? '',
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: t('언어')),
+                      items: [
+                        DropdownMenuItem(value: '', child: Text(t('시스템 기본값'))),
+                        for (final entry in supportedLanguages.entries)
+                          DropdownMenuItem(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          widget.onLanguageChanged!(
+                            value.isEmpty ? null : value,
+                          );
+                        }
+                      },
+                    ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(t('시스템 뷰어 선호')),
+                    subtitle: Text(
+                      t(
+                        Platform.isIOS
+                            ? 'PDF·Office·텍스트를 가능한 경우 iOS 미리보기로 열기'
+                            : 'HWP 계열과 사진을 제외한 문서는 가능한 경우 시스템 앱으로 열기',
+                      ),
+                    ),
+                    value: _preferSystem,
+                    onChanged: (value) {
+                      setSheetState(() => _preferSystem = value ?? false);
+                      unawaited(
+                        _preferences.setBool(_systemViewerKey, _preferSystem),
+                      );
+                    },
+                  ),
+                  const AdPrivacyOptions(),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -479,9 +527,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: _appBackground,
       appBar: AppBar(
-        title: const Text(
-          '홈',
-          style: TextStyle(
+        title: Text(
+          _t('홈'),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: Color(0xFF3D3A35),
@@ -491,7 +539,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         toolbarHeight: 52,
         actions: [
           IconButton(
-            tooltip: '설정',
+            tooltip: _t('설정'),
             onPressed: _loaded ? _settings : null,
             icon: const Icon(Icons.settings, size: 22, color: _muted),
           ),
@@ -499,28 +547,33 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
         ],
       ),
       body: _converting
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(
-                semanticsLabel: 'Office 문서 변환 중',
+                semanticsLabel: _t('Office 문서 변환 중'),
               ),
             )
           : ListView(
               padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
               physics: const BouncingScrollPhysics(),
               children: [
-                const Text('요약', style: sectionTitle),
+                Text(_t('요약'), style: sectionTitle),
                 const SizedBox(height: 8),
-                _HomeSummary(activity: _activity, now: now, tip: _tip),
+                _HomeSummary(
+                  activity: _activity,
+                  now: now,
+                  tip: homeTip(languageOf(context), _tipIndex),
+                ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('문서', style: sectionTitle),
-                    const Flexible(
+                    Text(_t('문서'), style: sectionTitle),
+                    const SizedBox(width: 8),
+                    Flexible(
                       child: Text(
-                        'HWP · HWPX 오프라인 열람',
+                        _t('HWP · HWPX 오프라인 열람'),
                         textAlign: TextAlign.end,
-                        style: TextStyle(fontSize: 11, color: _muted),
+                        style: const TextStyle(fontSize: 11, color: _muted),
                       ),
                     ),
                   ],
@@ -536,29 +589,37 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                           children: [
                             const _Illustration('document_history'),
                             const SizedBox(width: 8),
-                            const Text('최근 문서 (최대 10개)', style: sectionTitle),
+                            Flexible(
+                              child: Text(
+                                _t('최근 문서 (최대 10개)'),
+                                style: sectionTitle,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         if (_history.isEmpty)
                           ConstrainedBox(
                             constraints: const BoxConstraints(minHeight: 120),
-                            child: const Center(
+                            child: Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.insert_drive_file_outlined,
                                     size: 32,
                                     color: Color(0xFFBDBDBD),
                                   ),
-                                  SizedBox(height: 8),
-                                  Text('최근에 연 문서가 없어요'),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 8),
                                   Text(
-                                    '파일 열기로 문서를 추가해보세요',
+                                    _t('최근에 연 문서가 없어요'),
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _t('파일 열기로 문서를 추가해보세요'),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
                                       fontSize: 11,
                                       color: _muted,
                                     ),
@@ -595,12 +656,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                     horizontalTitleGap: 8,
                     minTileHeight: 68,
                     leading: const _Illustration('open_file'),
-                    title: const Text('파일 열기', style: sectionTitle),
-                    subtitle: const Text(
-                      'HWP · PDF · Office · CSV · TXT · 이미지',
+                    title: Text(_t('파일 열기'), style: sectionTitle),
+                    subtitle: Text(
+                      'HWP · PDF · Office · CSV · TXT · ${_t('이미지')}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 10, color: _muted),
+                      style: const TextStyle(fontSize: 10, color: _muted),
                     ),
                     trailing: const Icon(
                       Icons.chevron_right,
@@ -623,7 +684,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                       horizontalTitleGap: 8,
                       minTileHeight: 56,
                       leading: const Icon(Icons.photo_outlined, color: _muted),
-                      title: const Text('사진 열기', style: sectionTitle),
+                      title: Text(_t('사진 열기'), style: sectionTitle),
                       trailing: const Icon(
                         Icons.chevron_right,
                         size: 20,
@@ -646,19 +707,21 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     final minutes = seconds / 60;
     final hours = minutes / 60;
     final days = hours / 24;
-    return switch (seconds) {
-      < 45 => '방금 전',
-      < 90 => '약 1분 전',
-      _ when minutes < 45 => '${minutes.round()}분 전',
-      _ when minutes < 90 => '약 1시간 전',
-      _ when hours < 24 => '${hours.round()}시간 전',
-      _ when hours < 48 => '약 1일 전',
-      _ when days < 30 => '${days.round()}일 전',
-      _ when days < 60 => '약 1달 전',
-      _ when days < 365 => '${(days / 30).round()}달 전',
-      _ when days < 730 => '약 1년 전',
-      _ => '${(days / 365).round()}년 전',
+    final (key, value) = switch (seconds) {
+      < 45 => ('방금 전', null),
+      < 90 => ('약 1분 전', null),
+      _ when minutes < 45 => ('{n}분 전', minutes.round()),
+      _ when minutes < 90 => ('약 1시간 전', null),
+      _ when hours < 24 => ('{n}시간 전', hours.round()),
+      _ when hours < 48 => ('약 1일 전', null),
+      _ when days < 30 => ('{n}일 전', days.round()),
+      _ when days < 60 => ('약 1달 전', null),
+      _ when days < 365 => ('{n}달 전', (days / 30).round()),
+      _ when days < 730 => ('약 1년 전', null),
+      _ => ('{n}년 전', (days / 365).round()),
     };
+    final text = _t(key);
+    return value == null ? text : text.replaceAll('{n}', '$value');
   }
 
   Widget _recent(Document document) {
@@ -706,18 +769,24 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             ),
             trailing: document.openedAt == null
                 ? null
-                : Text(
-                    _elapsed(document.openedAt!),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF6F6F6F),
+                : ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 85),
+                    child: Text(
+                      _elapsed(document.openedAt!),
+                      maxLines: 2,
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF6F6F6F),
+                      ),
                     ),
                   ),
             onTap: () => _open(document),
           ),
         ),
         IconButton(
-          tooltip: '최근 문서에서 삭제',
+          tooltip: _t('최근 문서에서 삭제'),
           onPressed: () => unawaited(_remove(document)),
           icon: const Icon(Icons.close, size: 16, color: _muted),
         ),
@@ -772,6 +841,9 @@ class _HomeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reset = activity.daysUntilReset(now);
+    String t(String korean) => translate(context, korean, homeStrings);
+    final formatNumber = MaterialLocalizations.of(context).formatDecimal;
+
     return _HomeCard(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -802,16 +874,18 @@ class _HomeSummary extends StatelessWidget {
                                   spacing: 8,
                                   crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    const Text(
-                                      '주간 열람',
-                                      style: TextStyle(
+                                    Text(
+                                      t('주간 열람'),
+                                      style: const TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                         color: Color(0xFF616161),
                                       ),
                                     ),
                                     Text(
-                                      '$reset일 후 초기화',
+                                      t(
+                                        reset == 1 ? '1일 후 초기화' : '{n}일 후 초기화',
+                                      ).replaceAll('{n}', '$reset'),
                                       style: const TextStyle(
                                         color: _muted,
                                         fontSize: 11,
@@ -822,7 +896,7 @@ class _HomeSummary extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${opens.toInt()} / ∞',
+                                '${formatNumber(opens.toInt())} / ∞',
                                 style: const TextStyle(
                                   color: _muted,
                                   fontSize: 12,
@@ -858,18 +932,22 @@ class _HomeSummary extends StatelessWidget {
                 Expanded(
                   child: _Stat(
                     icon: 'calendar_bun',
-                    title: '연속 사용',
+                    title: t('연속 사용'),
                     value: activity.streak(now),
-                    suffix: '일',
+                    formatValue: (number, capped) => t(
+                      !capped && number == 1 ? '1일' : '{n}일',
+                    ).replaceAll('{n}', capped ? '999+' : '$number'),
                   ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: _Stat(
                     icon: 'document_open',
-                    title: '이번 주 페이지',
+                    title: t('이번 주 페이지'),
                     value: activity.weeklyPages(now),
-                    suffix: 'p',
+                    formatValue: (number, capped) => t(
+                      '{n}p',
+                    ).replaceAll('{n}', capped ? '999+' : '$number'),
                   ),
                 ),
               ],
@@ -902,13 +980,13 @@ class _Stat extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.value,
-    required this.suffix,
+    required this.formatValue,
   });
 
   final String icon;
   final String title;
   final int value;
-  final String suffix;
+  final String Function(int value, bool capped) formatValue;
 
   @override
   Widget build(BuildContext context) => _SummaryTile(
@@ -933,7 +1011,7 @@ class _Stat extends StatelessWidget {
                 duration: _summaryAnimation,
                 curve: Curves.easeOutCubic,
                 builder: (context, animatedValue, _) => Text(
-                  '${animatedValue >= 1000 ? '999+' : animatedValue.toInt()}$suffix',
+                  formatValue(animatedValue.toInt(), animatedValue >= 1000),
                   style: const TextStyle(
                     fontSize: 14,
                     height: 1.12,

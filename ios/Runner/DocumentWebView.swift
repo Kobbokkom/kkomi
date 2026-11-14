@@ -148,6 +148,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   private let webView: WKWebView
   private let channel: FlutterMethodChannel
   private let fileExtension: String
+  private let viewerStrings: String
   private let name: String
   private let hasFile: Bool
   private var pageCount = 0
@@ -164,6 +165,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   init(frame: CGRect, file: URL?, assets: URL?, document: [String: String], channel: FlutterMethodChannel) {
     self.channel = channel
     self.fileExtension = document["extension"] ?? ""
+    self.viewerStrings = document["viewerStrings"] ?? "{}"
     self.name = document["name"] ?? "문서"
     self.hasFile = file != nil
     let configuration = WKWebViewConfiguration()
@@ -272,7 +274,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
       guard let startupTimeout else { return }
       startupTimeout.cancel()
       self.startupTimeout = nil
-      webView.evaluateJavaScript("void window.openDocument(\(json(fileExtension)))") { [weak self] _, error in
+      webView.evaluateJavaScript("void window.openDocument(\(json(fileExtension)), \(json(viewerStrings)))") { [weak self] _, error in
         if error != nil {
           self?.channel.invokeMethod("error", arguments: "문서 뷰어를 시작할 수 없습니다.")
         }
@@ -349,7 +351,8 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     exportDirectory = directory
     let stem = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
-    let filename = stem.isEmpty ? "문서.pdf" : "\(stem.prefix(100)).pdf"
+    let labels = (try? JSONSerialization.jsonObject(with: Data(viewerStrings.utf8))) as? [String: String]
+    let filename = stem.isEmpty ? "\(labels?["document"] ?? "문서").pdf" : "\(stem.prefix(100)).pdf"
     let output = directory.appendingPathComponent(filename)
     do {
       try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
