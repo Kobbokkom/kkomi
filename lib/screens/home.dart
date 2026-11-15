@@ -494,122 +494,102 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           const SizedBox(width: 20),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
-        physics: const BouncingScrollPhysics(),
-        children: [
-          Text(_t('요약'), style: sectionTitle),
-          const SizedBox(height: 8),
-          _HomeSummary(
-            activity: _activity,
-            now: now,
-            tip: homeTip(languageOf(context), _tipIndex),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(_t('문서'), style: sectionTitle),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  _t('HWP · HWPX 오프라인 열람'),
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(fontSize: 11, color: _muted),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _HomeCard(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      const _Illustration('document_history'),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(_t('최근 문서 (최대 10개)'), style: sectionTitle),
-                      ),
-                    ],
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(32, 16, 32, 24),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            Text(_t('요약'), style: sectionTitle),
+            const SizedBox(height: 8),
+            _HomeSummary(
+              activity: _activity,
+              now: now,
+              tip: homeTip(languageOf(context), _tipIndex),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(_t('문서'), style: sectionTitle),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _t('HWP · HWPX 오프라인 열람'),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(fontSize: 11, color: _muted),
                   ),
-                  const SizedBox(height: 10),
-                  if (_history.isEmpty)
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 120),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.insert_drive_file_outlined,
-                              size: 32,
-                              color: Color(0xFFBDBDBD),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _t('최근에 연 문서가 없어요'),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _t('파일을 열면 여기에 표시돼요'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: _muted,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _HomeCard(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const _Illustration('document_history'),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _t('최근 문서 (최대 10개)'),
+                            style: sectionTitle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (_history.isEmpty)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 120),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.insert_drive_file_outlined,
+                                size: 32,
+                                color: Color(0xFFBDBDBD),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              Text(
+                                _t('최근에 연 문서가 없어요'),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _t('파일을 열면 여기에 표시돼요'),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: _muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 146,
+                        child: ListView.separated(
+                          primary: false,
+                          physics: const ClampingScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          itemCount: _history.length,
+                          itemBuilder: (_, index) => _recent(_history[index]),
+                          separatorBuilder: (_, _) =>
+                              const Divider(height: 1, thickness: 0.5),
                         ),
                       ),
-                    )
-                  else
-                    SizedBox(
-                      height: 146,
-                      child: ListView.separated(
-                        primary: false,
-                        physics: const ClampingScrollPhysics(),
-                        padding: EdgeInsets.zero,
-                        itemCount: _history.length,
-                        itemBuilder: (_, index) => _recent(_history[index]),
-                        separatorBuilder: (_, _) =>
-                            const Divider(height: 1, thickness: 0.5),
-                      ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          _HomeCard(
-            child: ListTile(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(_radius),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-              horizontalTitleGap: 8,
-              minTileHeight: 68,
-              leading: const _Illustration('open_file'),
-              title: Text(_t('파일 열기'), style: sectionTitle),
-              subtitle: Text(
-                'HWP · PDF · Office · CSV · TXT · ${_t('이미지')}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, color: _muted),
-              ),
-              trailing: const Icon(
-                Icons.chevron_right,
-                size: 20,
-                color: _muted,
-              ),
-              onTap: _picking || !_loaded ? null : _pick,
-            ),
-          ),
-          if (Platform.isIOS) ...[
             const SizedBox(height: 10),
             _HomeCard(
               child: ListTile(
@@ -618,19 +598,46 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                 horizontalTitleGap: 8,
-                minTileHeight: 56,
-                leading: const Icon(Icons.photo_outlined, color: _muted),
-                title: Text(_t('사진 열기'), style: sectionTitle),
+                minTileHeight: 68,
+                leading: const _Illustration('open_file'),
+                title: Text(_t('파일 열기'), style: sectionTitle),
+                subtitle: Text(
+                  'HWP · PDF · Office · CSV · TXT · ${_t('이미지')}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 10, color: _muted),
+                ),
                 trailing: const Icon(
                   Icons.chevron_right,
                   size: 20,
                   color: _muted,
                 ),
-                onTap: _picking || !_loaded ? null : () => _pick(photo: true),
+                onTap: _picking || !_loaded ? null : _pick,
               ),
             ),
+            if (Platform.isIOS) ...[
+              const SizedBox(height: 10),
+              _HomeCard(
+                child: ListTile(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(_radius),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  horizontalTitleGap: 8,
+                  minTileHeight: 56,
+                  leading: const Icon(Icons.photo_outlined, color: _muted),
+                  title: Text(_t('사진 열기'), style: sectionTitle),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: _muted,
+                  ),
+                  onTap: _picking || !_loaded ? null : () => _pick(photo: true),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       bottomNavigationBar: const SafeArea(top: false, child: AdBanner()),
     );

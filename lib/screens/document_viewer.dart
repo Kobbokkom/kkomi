@@ -696,53 +696,57 @@ class _DocumentViewerState extends State<DocumentViewer> {
               }, style: Theme.of(context).textTheme.bodySmall),
             ),
           Expanded(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (Platform.isIOS)
-                  UiKitView(
-                    viewType: viewType,
-                    creationParams: creationParams,
-                    creationParamsCodec: creationParamsCodec,
-                    onPlatformViewCreated: _created,
-                  )
-                else
-                  AndroidView(
-                    viewType: viewType,
-                    creationParams: creationParams,
-                    creationParamsCodec: creationParamsCodec,
-                    onPlatformViewCreated: _created,
-                  ),
-                if (!ready)
-                  ColoredBox(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    child: Center(
-                      child: _error == null
-                          ? CircularProgressIndicator(
-                              semanticsLabel: _text('문서 열기'),
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                _errorText(_error, '문서 뷰어를 열 수 없습니다.'),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (Platform.isIOS)
+                    UiKitView(
+                      viewType: viewType,
+                      creationParams: creationParams,
+                      creationParamsCodec: creationParamsCodec,
+                      onPlatformViewCreated: _created,
+                    )
+                  else
+                    AndroidView(
+                      viewType: viewType,
+                      creationParams: creationParams,
+                      creationParamsCodec: creationParamsCodec,
+                      onPlatformViewCreated: _created,
                     ),
-                  ),
-                if (ready && !_hasPageToolbar && _pageCount > 1)
-                  Positioned(
-                    bottom: 8,
-                    right: 12,
-                    child: Tooltip(
-                      message: _text('페이지 이동'),
-                      child: FilledButton.tonal(
-                        onPressed: _selectPage,
-                        child: Text('${_page + 1} / $_pageCount'),
+                  if (!ready)
+                    ColoredBox(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: Center(
+                        child: _error == null
+                            ? CircularProgressIndicator(
+                                semanticsLabel: _text('문서 열기'),
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  _errorText(_error, '문서 뷰어를 열 수 없습니다.'),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
                       ),
                     ),
-                  ),
-              ],
+                  if (ready && !_hasPageToolbar && _pageCount > 1)
+                    Positioned(
+                      bottom: 8,
+                      right: 12,
+                      child: Tooltip(
+                        message: _text('페이지 이동'),
+                        child: FilledButton.tonal(
+                          onPressed: _selectPage,
+                          child: Text('${_page + 1} / $_pageCount'),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           if (ready && _bottomSearch) _documentToolbar(),
