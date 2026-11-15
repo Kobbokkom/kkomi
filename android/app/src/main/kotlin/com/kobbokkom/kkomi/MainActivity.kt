@@ -1,9 +1,12 @@
 package com.kobbokkom.kkomi
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.os.storage.StorageManager
 import android.provider.DocumentsContract
@@ -13,6 +16,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executors
 
@@ -80,16 +84,24 @@ class MainActivity : FlutterActivity() {
     private var pdfSave: Pair<Uri, MethodChannel.Result>? = null
     private var discardAfterSave: Uri? = null
     private var listening = false
+    private var pendingMessage: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // A restored activity and a launch from Recents replay an intent that was already opened.
+        if (savedInstanceState != null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) {
+            intent = Intent(Intent.ACTION_MAIN)
+        }
+        super.onCreate(savedInstanceState)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         conversions.execute {
-            File(cacheDir, "office_pdfs").deleteRecursively()
-            File(cacheDir, "converted").listFiles { file ->
-                file.name.startsWith("kkomi-office-") && file.extension == "pdf"
-            }?.forEach(File::delete)
+            // No document is open yet, so converted PDFs and conversion inputs are leftovers.
+            File(cacheDir, "converted").deleteRecursively()
             cacheDir.listFiles { file ->
-                file.name.startsWith("office-input-") && file.extension == "tmp"
+                file.extension == "tmp" &&
+                    (file.name.startsWith("kkomi-text-input-") || file.name.startsWith("docx-estimate-"))
             }?.forEach(File::delete)
         }
         val messenger = flutterEngine.dartExecutor.binaryMessenger
@@ -103,6 +115,8 @@ class MainActivity : FlutterActivity() {
                         listening = true
                         result.success(null)
                         handleIntent(intent)
+                        pendingMessage?.let { channel?.invokeMethod("openError", it) }
+                        pendingMessage = null
                     }
                     "pick" -> pickDocument { document, error ->
                         if (error == null) result.success(document) else result.error("document", error, null)
@@ -222,7 +236,14 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == SAVE_CONVERTED_PDF) {
-            val (source, result) = pdfSave ?: return
+            val (source, result) = pdfSave ?: run {
+                // The activity was recreated, so the PDF to save is gone.
+                data?.data?.takeIf { resultCode == Activity.RESULT_OK }?.let { target ->
+                    documents.execute { deleteIfEmpty(target) }
+                    reportLater("PDF를 저장할 수 없습니다.")
+                }
+                return
+            }
             pdfSave = null
             val shouldDiscard = discardAfterSave == source
             discardAfterSave = null
@@ -239,6 +260,7 @@ class MainActivity : FlutterActivity() {
                             output.use(input::copyTo)
                         }
                     }.isSuccess
+                    if (!saved) deleteIfEmpty(target)
                     if (shouldDiscard) discardConvertedPdf(source)
                     runOnUiThread {
                         if (saved) result.success(null)
@@ -249,14 +271,34 @@ class MainActivity : FlutterActivity() {
             return
         }
         if (requestCode != PICK_DOCUMENT) return
-        val result = picker ?: return
-        picker = null
         val uri = data?.data
+        val result = picker ?: run {
+            // The activity was recreated while the picker was open. Open the choice like an intent.
+            if (resultCode == Activity.RESULT_OK && uri != null) {
+                intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, data.type)
+                if (listening) handleIntent(intent)
+            }
+            return
+        }
+        picker = null
         if (resultCode != Activity.RESULT_OK || uri == null) {
             result(null, null)
             return
         }
         importDocument(uri, data.type, result)
+    }
+
+    // The save target may be an existing PDF the user chose to overwrite.
+    private fun deleteIfEmpty(uri: Uri) {
+        runCatching {
+            val size = contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+                ?.use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null }
+            if (size == 0L) DocumentsContract.deleteDocument(contentResolver, uri)
+        }
+    }
+
+    private fun reportLater(message: String) {
+        if (listening) channel?.invokeMethod("openError", message) else pendingMessage = message
     }
 
     private fun isConvertedPdf(uri: Uri): Boolean =
@@ -301,7 +343,14 @@ class MainActivity : FlutterActivity() {
                 stream ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
             }
             else -> null
-        } ?: return
+        }
+        if (uri == null) {
+            if (intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_VIEW) {
+                setIntent(Intent(Intent.ACTION_MAIN))
+                channel?.invokeMethod("openError", "지원하지 않는 파일 형식입니다.")
+            }
+            return
+        }
         setIntent(Intent(Intent.ACTION_MAIN))
         val report: DocumentResult = { document, error ->
             if (document != null) channel?.invokeMethod("open", document)
@@ -414,6 +463,8 @@ class MainActivity : FlutterActivity() {
     private fun copySharedDocument(uri: Uri, extension: String, displayName: String): Uri {
         val directory = File(filesDir, "documents").apply { mkdirs() }
         val file = File(directory, "${UUID.randomUUID()}.$extension")
+        // The same name and bytes reuse one copy, so sharing a file again keeps one recent entry.
+        val digest = MessageDigest.getInstance("SHA-256").apply { update(displayName.toByteArray()); update(0) }
         try {
             val input = contentResolver.openInputStream(uri) ?: throw DocumentException("파일을 읽을 수 없습니다.")
             input.use { source ->
@@ -426,10 +477,14 @@ class MainActivity : FlutterActivity() {
                         total += read
                         if (total > MAX_DOCUMENT_BYTES) throw DocumentException("64MB 이하의 문서를 열 수 있습니다.")
                         target.write(buffer, 0, read)
+                        digest.update(buffer, 0, read)
                     }
                 }
             }
-            return FileProvider.getUriForFile(this, "$packageName.documents", file, displayName)
+            val hash = digest.digest().take(16).joinToString("") { "%02x".format(it) }
+            val stored = File(directory, "$hash.$extension")
+            if (stored.exists()) file.delete() else if (!file.renameTo(stored)) error("Could not store document")
+            return FileProvider.getUriForFile(this, "$packageName.documents", stored, displayName)
         } catch (error: Exception) {
             file.delete()
             throw error
@@ -451,26 +506,37 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun shareOrOpen(uri: Uri, mime: String, share: Boolean, result: MethodChannel.Result) {
+        var excluded: Array<ComponentName>? = null
         val request = if (share) {
             Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM, uri)
         } else {
             Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).apply {
-                // Exclude our own viewer from the targets.
-                val viewer = packageManager.queryIntentActivities(this, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
-                    .firstOrNull { it.activityInfo.packageName != packageName &&
-                        it.activityInfo.packageName != "com.kobbokkom.kkomi" &&
-                        !it.activityInfo.packageName.startsWith("com.kobbokkom.kkomi.preview") }
-                if (viewer == null) {
+                val (own, others) = packageManager.queryIntentActivities(this, PackageManager.MATCH_DEFAULT_ONLY)
+                    .map { ComponentName(it.activityInfo.packageName, it.activityInfo.name) }
+                    .partition { it.packageName == packageName || it.packageName.startsWith("com.kobbokkom.kkomi") }
+                if (others.isEmpty()) {
                     result.error("viewer", "이 형식을 열 수 있는 다른 앱이 설치되어 있지 않습니다.", null)
                     return
                 }
-                setClassName(viewer.activityInfo.packageName, viewer.activityInfo.name)
+                // Without a default, this resolves to the system resolver, which is not in the list.
+                val default = packageManager.resolveActivity(this, PackageManager.MATCH_DEFAULT_ONLY)
+                    ?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+                val target = default?.takeIf(others::contains) ?: others.singleOrNull()
+                if (target != null) component = target else excluded = own.toTypedArray()
             }
         }
         request.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         request.clipData = android.content.ClipData.newRawUri("document", uri)
         try {
-            startActivity(if (share) Intent.createChooser(request, null) else request)
+            startActivity(
+                if (share || excluded != null) {
+                    Intent.createChooser(request, null).apply {
+                        excluded?.let { putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, it) }
+                    }
+                } else {
+                    request
+                },
+            )
             result.success(null)
         } catch (_: Exception) {
             result.error("viewer", "문서를 다른 앱으로 열 수 없습니다.", null)

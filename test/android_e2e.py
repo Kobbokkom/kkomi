@@ -104,6 +104,10 @@ class Device:
     def back(self):
         self.shell("input", "keyevent", "KEYCODE_BACK")
 
+    def private_copies(self):
+        listing = self.adb("shell", "run-as", PACKAGE, "find", "files", "-path", "files/documents/*")
+        return set(listing.split())
+
     def launch(self):
         self.shell("am", "start", "-W", "-n", ACTIVITY)
 
@@ -515,6 +519,7 @@ def run(device):
     device.has("최근 문서")
 
     # An actual Android DocumentsUI VIEW intent and an actual SEND chooser grant.
+    copies_before = device.private_copies()
     launch_files(device)
     device.storage_folder()
     device.select_file("many.hwp")
@@ -537,6 +542,8 @@ def run(device):
     device.has("1 / 11")
     device.back()
     device.has("최근 문서")
+    # DocumentsUI grants may be persistable, so copies are optional; one name and its bytes keep one copy.
+    assert len(device.private_copies() - copies_before) <= 1, device.private_copies() - copies_before
     # A file URI with no grant opens SAF; a subsequent launch can reuse that grant.
     legacy = f"file://{REMOTE}/legacy-intent.hwp"
     device.adb("push", str(FIXTURES / "offline.hwp"), f"{REMOTE}/legacy-intent.hwp")
@@ -554,6 +561,24 @@ def run(device):
     device.has("PDF로 저장")
     device.back()
     device.has("legacy-intent.hwp")
+    # Reopening a finished task from Recents must not replay its original document intent.
+    device.shell("am", "force-stop", PACKAGE)
+    device.shell(*intent[:-2], "-f", "0x00100000", "-p", PACKAGE)
+    device.has("최근 문서")
+    time.sleep(3)
+    assert not any("PDF로 저장" in value for n in device.nodes() for value in device.labels(n))
+    # Shared text and links are not documents.
+    device.shell("am", "start", "-W", "-a", "android.intent.action.SEND", "-t", "text/plain",
+                 "--es", "android.intent.extra.TEXT", "https://example.invalid/", "-p", PACKAGE)
+    device.has("지원하지 않는 파일 형식입니다.")
+    # A picker result reaches a recreated activity.
+    device.shell("settings", "put", "global", "always_finish_activities", "1")
+    try:
+        device.open("offline.hwpx", "PDF로 저장")
+    finally:
+        device.shell("settings", "put", "global", "always_finish_activities", "0")
+    device.back()
+    device.has("최근 문서")
     print("PASS launch, statistics, file associations, sharing, export and persistence", flush=True)
 
 
