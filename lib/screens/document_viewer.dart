@@ -569,6 +569,12 @@ class _DocumentViewerState extends State<DocumentViewer> {
         'uri': uri,
         'extension': 'pdf',
       },
+      // ODS waits for the renderer to read the sheet print options.
+      'canPrint':
+          widget.convertedPdf == null &&
+          widget.document.canExportPdf &&
+          widget.document.extension != 'ods',
+      'isSlide': widget.document.isSlide,
     };
     final directSave =
         ready &&

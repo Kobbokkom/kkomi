@@ -24,8 +24,8 @@ final class DocumentWebViewFactory: NSObject, FlutterPlatformViewFactory {
   func create(
     withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?
   ) -> FlutterPlatformView {
-    let document = args as? [String: String] ?? [:]
-    let file = document["uri"].flatMap { try? DocumentAccess.importedFile($0) }
+    let document = args as? [String: Any] ?? [:]
+    let file = (document["uri"] as? String).flatMap { try? DocumentAccess.importedFile($0) }
     let channel = FlutterMethodChannel(name: "kkomi/viewer/\(viewId)", binaryMessenger: registrar.messenger())
     let assetKey = registrar.lookupKey(forAsset: "assets/viewer.html") as NSString
     let assets = Bundle.main.url(forResource: assetKey.deletingPathExtension, withExtension: assetKey.pathExtension)?
@@ -153,26 +153,22 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   private let hasFile: Bool
   private var pageCount = 0
   private var startupTimeout: DispatchWorkItem?
-  private lazy var canPrint = Self.printableFormats.contains(fileExtension) && fileExtension != "ods"
+  private var canPrint: Bool
   private var slidePaper: CGSize?
   private var printResult: FlutterResult?
   private var printTimeout: DispatchWorkItem?
   private var exportDirectory: URL?
 
   private var isHwp: Bool { fileExtension == "hwp" || fileExtension == "hwpx" }
-  private static let slideFormats: Set<String> = ["ppt", "pptx", "ppsx", "potx", "odp"]
-  private static let printableFormats = slideFormats.union([
-    "txt", "csv", "tsv", "md", "svg",
-    "doc", "docx", "dotx", "docm", "odt", "rtf",
-    "xls", "xlsx", "xltx", "xlsm", "ods",
-  ])
-  private var isSlide: Bool { Self.slideFormats.contains(fileExtension) }
+  private let isSlide: Bool
 
-  init(frame: CGRect, file: URL?, assets: URL?, document: [String: String], channel: FlutterMethodChannel) {
+  init(frame: CGRect, file: URL?, assets: URL?, document: [String: Any], channel: FlutterMethodChannel) {
     self.channel = channel
-    self.fileExtension = document["extension"] ?? ""
-    self.viewerStrings = document["viewerStrings"] ?? "{}"
-    self.name = document["name"] ?? "문서"
+    self.fileExtension = document["extension"] as? String ?? ""
+    self.viewerStrings = document["viewerStrings"] as? String ?? "{}"
+    self.name = document["name"] as? String ?? "문서"
+    self.canPrint = document["canPrint"] as? Bool ?? false
+    self.isSlide = document["isSlide"] as? Bool ?? false
     self.hasFile = file != nil
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()

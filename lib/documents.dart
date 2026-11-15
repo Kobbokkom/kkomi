@@ -56,6 +56,9 @@ class Document {
     'odp',
   }.contains(extension);
 
+  bool get isSlide =>
+      const {'ppt', 'pptx', 'ppsx', 'potx', 'odp'}.contains(extension);
+
   bool get canExportPdf =>
       isOffice || const {'txt', 'csv', 'tsv', 'md', 'svg'}.contains(extension);
 

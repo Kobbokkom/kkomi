@@ -34,12 +34,6 @@ import java.io.InputStream
 
 private const val ORIGIN = "https://appassets.androidplatform.net"
 private const val VIEWER_URL = "$ORIGIN/assets/viewer.html"
-private val slideFormats = setOf("ppt", "pptx", "ppsx", "potx", "odp")
-private val printableFormats = slideFormats + setOf(
-    "txt", "csv", "tsv", "md", "svg",
-    "doc", "docx", "dotx", "docm", "odt", "rtf",
-    "xls", "xlsx", "xltx", "xlsm", "ods",
-)
 
 internal class DocumentWebViewFactory(private val messenger: BinaryMessenger) :
     PlatformViewFactory(StandardMessageCodec.INSTANCE) {
@@ -52,6 +46,8 @@ internal class DocumentWebViewFactory(private val messenger: BinaryMessenger) :
             document["extension"] as String,
             document["name"] as String,
             document["viewerStrings"] as? String ?: "{}",
+            document["canPrint"] == true,
+            document["isSlide"] == true,
         )
     }
 }
@@ -63,6 +59,8 @@ private class DocumentWebView(
     private val extension: String,
     private val name: String,
     private val viewerStrings: String,
+    private var canPrint: Boolean,
+    private val isSlide: Boolean,
 ) : PlatformView {
     private val webView = WebView(context)
     private val labels by lazy { runCatching { JSONObject(viewerStrings) }.getOrNull() }
@@ -72,7 +70,6 @@ private class DocumentWebView(
     private val startupTimeout = Runnable { failStartup() }
     private var hwpPrintResult: MethodChannel.Result? = null
     private var printing = false
-    private var canPrint = extension in printableFormats && extension != "ods"
     private var slideMedia: PrintAttributes.MediaSize? = null
     private val hwpPrintTimeout = Runnable { failHwpPrint("PDF를 준비하는 데 시간이 너무 오래 걸립니다.") }
 
@@ -189,7 +186,7 @@ private class DocumentWebView(
                         val dimensions = data.optJSONObject("value")
                         val width = dimensions?.optInt("width") ?: 0
                         val height = dimensions?.optInt("height") ?: 0
-                        if (extension in slideFormats && width in 1000..56000 && height in 1000..56000) {
+                        if (isSlide && width in 1000..56000 && height in 1000..56000) {
                             val label = labels?.optString("slideSize", "슬라이드 크기") ?: "슬라이드 크기"
                             slideMedia = PrintAttributes.MediaSize("kkomi-slide", label, width, height)
                         }
@@ -258,7 +255,6 @@ private class DocumentWebView(
                         webView.evaluateJavascript("window.prepareHwpPrint()", null)
                         return@setMethodCallHandler
                     }
-                    val isSlide = extension in slideFormats
                     val paper = if (isSlide) {
                         slideMedia ?: PrintAttributes.MediaSize.ISO_A4.asLandscape()
                     } else {
