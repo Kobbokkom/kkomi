@@ -66,7 +66,7 @@ self.onmessage = async ({ data: { extension, bytes, password } }) => {
     });
     const encrypted = doc.isPasswordEncrypted();
     // This engine cannot expose original sheet visibility after unlocking ODS.
-    if (format.type === "ods" && encrypted) throw new Error("시트 표시 상태를 확인할 수 없어요.");
+    if (format.type === "ods" && encrypted) throw new Error("Encrypted ODS sheet visibility is unavailable");
     let incorrect = false;
     while (doc.isPasswordEncrypted()) {
       const password = await requestPassword(incorrect);

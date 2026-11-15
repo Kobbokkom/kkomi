@@ -33,3 +33,6 @@ web/
 
 # Python Android E2E
 __pycache__/
+
+# Node test tools
+node_modules/

@@ -50,7 +50,8 @@ class _DocumentViewerState extends State<DocumentViewer> {
       widget.document.extension == 'pdf' || widget.convertedPdf != null;
   bool get _hasPageToolbar => _isPdf || widget.document.isHwp;
   bool get _bottomSearch =>
-      _hasPageToolbar || widget.document.extension == 'docx';
+      _hasPageToolbar ||
+      const {'docx', 'dotx', 'docm'}.contains(widget.document.extension);
   String get _unfittedImageLabel =>
       Platform.isIOS &&
           const {
@@ -511,16 +512,19 @@ class _DocumentViewerState extends State<DocumentViewer> {
                           : null,
                       icon: const Icon(Icons.chevron_left),
                     ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFF3F3F3),
-                        foregroundColor: Colors.black87,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    Tooltip(
+                      message: _text('페이지 이동'),
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFF3F3F3),
+                          foregroundColor: Colors.black87,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
+                        onPressed: _selectPage,
+                        child: Text('${_page + 1} / $_pageCount'),
                       ),
-                      onPressed: _selectPage,
-                      child: Text('${_page + 1} / $_pageCount'),
                     ),
                     IconButton(
                       tooltip: _text('다음 페이지'),
@@ -621,7 +625,11 @@ class _DocumentViewerState extends State<DocumentViewer> {
               onSelected: (action) {
                 switch (action) {
                   case 'search':
-                    _toggleSearch();
+                    if (_bottomSearch && !_hasPageToolbar) {
+                      _searchFocus.requestFocus();
+                    } else {
+                      _toggleSearch();
+                    }
                   case 'page':
                     unawaited(_selectPage());
                   case 'outline':
@@ -720,9 +728,12 @@ class _DocumentViewerState extends State<DocumentViewer> {
                   Positioned(
                     bottom: 8,
                     right: 12,
-                    child: FilledButton.tonal(
-                      onPressed: _selectPage,
-                      child: Text('${_page + 1} / $_pageCount'),
+                    child: Tooltip(
+                      message: _text('페이지 이동'),
+                      child: FilledButton.tonal(
+                        onPressed: _selectPage,
+                        child: Text('${_page + 1} / $_pageCount'),
+                      ),
                     ),
                   ),
               ],

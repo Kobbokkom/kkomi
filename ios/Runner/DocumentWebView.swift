@@ -330,7 +330,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
       return
     }
     printResult = result
-    let timeout = DispatchWorkItem { [weak self] in self?.completePrint(error: "PDF를 준비하는 데 시간이 너무 걸립니다.") }
+    let timeout = DispatchWorkItem { [weak self] in self?.completePrint(error: "PDF를 준비하는 데 시간이 너무 오래 걸립니다.") }
     printTimeout = timeout
     DispatchQueue.main.asyncAfter(deadline: .now() + 90, execute: timeout)
     if isHwp {

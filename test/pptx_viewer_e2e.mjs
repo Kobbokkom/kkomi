@@ -1,4 +1,4 @@
-// Requires Playwright, Chrome, Python 3 and Poppler. Run with node test/pptx_viewer_e2e.mjs.
+// Requires `npm install` (Playwright), Chrome, Python 3 and Poppler. Covers PPTX and HWP viewer behavior. Run with node test/pptx_viewer_e2e.mjs.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -142,6 +142,17 @@ sys.stdout.buffer.write(result.getvalue())
     { event: 'error', value: '문서를 읽을 수 없습니다. 손상되었거나 지원하지 않는 형식일 수 있습니다.' },
   ]);
   console.log('PASS Office timeout terminates the worker and reports a distinct error');
+
+  documentBytes = await readFile(join(root, 'test/fixtures/android/many.hwp'));
+  await page.setViewportSize({ width: 400, height: 2000 });
+  await page.goto(`${origin}/assets/viewer.html`);
+  await page.evaluate(() => { void openDocument('hwp'); });
+  await page.waitForFunction(() => events.some(({ event }) => event === 'ready' || event === 'error'));
+  const hwpPages = await page.evaluate(() => events.find(({ event }) => event === 'ready')?.value);
+  assert.ok(hwpPages > 2, `HWP fixture opened with ${hwpPages} pages`);
+  await page.evaluate(() => scrollTo(0, document.scrollingElement.scrollHeight));
+  await page.waitForFunction(last => events.at(-1)?.event === 'page' && events.at(-1).value === last, hwpPages - 1);
+  console.log('PASS short HWP pages report the last page at the end of the document');
 } finally {
   await browser?.close();
   server.closeAllConnections();

@@ -84,7 +84,10 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
             sizes.push({ width, height });
         }
         viewer.replaceChildren(...pages);
-        await renderPage(0);
+        await renderPage(0).catch(() => {
+            failed.add(0);
+            pages[0].textContent = viewerText('pageFailed', '{page}쪽을 표시할 수 없습니다.', 1);
+        });
         for (const page of pages) observer.observe(page);
         window.addEventListener('scroll', scheduleRefresh, { passive: true });
         window.visualViewport?.addEventListener('scroll', scheduleRefresh, { passive: true });
@@ -301,7 +304,10 @@ export async function openHwp(bytes, viewer, reportPage, requestPassword) {
             const { top, bottom } = pages[index].getBoundingClientRect();
             return { index, distance: Math.max(top - anchor, anchor - bottom, 0) };
         }).sort((a, b) => a.distance - b.distance);
-        const closest = sorted[0]?.index;
+        // Short last pages never reach the anchor, so the scroll end selects the last page.
+        const position = window.scrollY + top;
+        const end = document.scrollingElement.scrollHeight - height;
+        const closest = position > 1 && position >= end - 1 ? pages.length - 1 : sorted[0]?.index;
         if (closest === undefined) return;
         if (closest !== reportedPage) {
             reportedPage = closest;

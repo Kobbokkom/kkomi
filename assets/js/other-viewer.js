@@ -446,7 +446,7 @@ export async function openOther(extension, bytes, viewer, reportPage, requestPas
   if (officeFormats.has(extension)) {
     const { officePages, docxSearch } = await import("./office-viewer.js");
     pages = await officePages(extension, bytes, requestPassword, reportPrintSize);
-    if (extension === "docx") occurrenceSearch = docxSearch(pages[0]);
+    if (officeFormats.get(extension).type === "docx") occurrenceSearch = docxSearch(pages[0]);
   } else {
     switch (extension) {
       case "tsv":

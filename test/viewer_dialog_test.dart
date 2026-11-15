@@ -123,4 +123,51 @@ void main() {
     expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('DOCX menu search focuses the bottom search field', (
+    tester,
+  ) async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    late MethodChannel viewer;
+    messenger.setMockMethodCallHandler(SystemChannels.platform_views, (
+      call,
+    ) async {
+      if (call.method == 'create') {
+        viewer = MethodChannel('kkomi/viewer/${(call.arguments as Map)['id']}');
+        messenger.setMockMethodCallHandler(viewer, (_) async => null);
+        return 0;
+      }
+      if (call.method == 'resize') {
+        final size = call.arguments as Map;
+        return {'width': size['width'], 'height': size['height']};
+      }
+      return null;
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: supportedLocales,
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: DocumentViewer(
+          document: const Document('content://test/dotx', 'a.dotx', 'dotx'),
+          onOpened: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+    await messenger.handlePlatformMessage(
+      viewer.name,
+      const StandardMethodCodec().encodeMethodCall(MethodCall('ready', 1)),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byType(EditableText);
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isFalse);
+    await tester.tap(find.byTooltip('Document menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Search'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+  });
 }
