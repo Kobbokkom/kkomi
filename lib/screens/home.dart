@@ -48,6 +48,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   Future<void> _historyWrite = Future<void>.value();
   bool _loaded = false;
   bool _activityLoaded = false;
+  bool _historyLoaded = false;
   bool _legacyHistoryPending = false;
   bool _preferSystem = false;
   bool _picking = false;
@@ -117,6 +118,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       final activity = HomeActivity.decode(activityData ?? legacy?.activity);
       setState(() {
         _history.addAll(history.take(10));
+        _historyLoaded = true;
         _preferSystem = preferSystem ?? migratedPreference ?? !Platform.isIOS;
         _activity = activity;
         _activityLoaded = activityData != null || legacy != null;
@@ -362,6 +364,8 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   }
 
   Future<void> _saveHistory({bool clearLegacyPending = false}) {
+    // An unread history would be overwritten by the in-memory list.
+    if (!_historyLoaded) return _historyWrite;
     final uris = _history.map((document) => document.uri).toSet();
     final snapshot = _history
         .map((entry) => jsonEncode(entry.toMap()))
@@ -443,7 +447,12 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                     onChanged: (value) {
                       setSheetState(() => _preferSystem = value ?? false);
                       unawaited(
-                        _preferences.setBool(_systemViewerKey, _preferSystem),
+                        _preferences
+                            .setBool(_systemViewerKey, _preferSystem)
+                            .catchError(
+                              (_) => _homeMessage('설정을 저장할 수 없습니다.'),
+                              test: (error) => error is PlatformException,
+                            ),
                       );
                     },
                   ),
@@ -575,7 +584,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                       )
                     else
                       SizedBox(
-                        height: 146,
+                        height: MediaQuery.textScalerOf(context).scale(146),
                         child: ListView.separated(
                           primary: false,
                           physics: const ClampingScrollPhysics(),
@@ -726,10 +735,16 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
             onTap: () => _open(document),
           ),
         ),
-        IconButton(
-          tooltip: _t('최근 문서 목록에서 제거'),
-          onPressed: () => unawaited(_remove(document)),
-          icon: const Icon(Icons.close, size: 16, color: _muted),
+        Semantics(
+          button: true,
+          label: '${_t('최근 문서 목록에서 제거')}\n${document.name}',
+          onTap: () => unawaited(_remove(document)),
+          excludeSemantics: true,
+          child: IconButton(
+            tooltip: _t('최근 문서 목록에서 제거'),
+            onPressed: () => unawaited(_remove(document)),
+            icon: const Icon(Icons.close, size: 16, color: _muted),
+          ),
         ),
       ],
     );

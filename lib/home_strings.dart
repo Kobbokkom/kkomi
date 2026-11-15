@@ -65,6 +65,17 @@ const homeStrings = <String, List<String>>{
     'Não foi possível salvar o histórico de documentos recentes.',
     'Daftar dokumen yang sudah dibuka tidak dapat disimpan.',
   ],
+  '설정을 저장할 수 없습니다.': [
+    'Could not save the setting.',
+    '設定を保存できません。',
+    '无法保存设置。',
+    '無法儲存設定。',
+    'No se pudo guardar el ajuste.',
+    'Impossible d’enregistrer le réglage.',
+    'Die Einstellung konnte nicht gespeichert werden.',
+    'Não foi possível salvar a configuração.',
+    'Pengaturan tidak dapat disimpan.',
+  ],
   '설정': [
     'Settings',
     '設定',
