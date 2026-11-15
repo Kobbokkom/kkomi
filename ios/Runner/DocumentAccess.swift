@@ -1,4 +1,4 @@
-import Darwin
+import CryptoKit
 import Flutter
 import PhotosUI
 import QuickLook
@@ -62,8 +62,11 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
   }
 
   private func open(_ url: URL) -> Bool {
-    guard url.isFileURL, Self.extensions.contains(url.pathExtension.lowercased()) else {
-      return false
+    guard url.isFileURL else { return false }
+    guard Self.extensions.contains(url.pathExtension.lowercased()) else {
+      deliver(("openError", DocumentError.unsupported.message))
+      Self.removeInboxCopy(url)
+      return true
     }
     importDocument(url) { [weak self] outcome in
       guard let self else { return }
@@ -72,13 +75,27 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
       case .success(let document): event = ("open", document)
       case .failure(let error): event = ("openError", error.message)
       }
-      if self.ready {
-        self.channel.invokeMethod(event.0, arguments: event.1)
-      } else {
-        self.pending.append(event)
-      }
+      self.deliver(event)
     }
     return true
+  }
+
+  private func deliver(_ event: (String, Any)) {
+    if ready {
+      channel.invokeMethod(event.0, arguments: event.1)
+    } else {
+      pending.append(event)
+    }
+  }
+
+  // Files shared without open-in-place arrive as a system copy in Documents/Inbox.
+  private static func removeInboxCopy(_ url: URL) {
+    guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    else { return }
+    let inbox = documents.appendingPathComponent("Inbox", isDirectory: true).resolvingSymlinksInPath().path
+    if url.resolvingSymlinksInPath().deletingLastPathComponent().path == inbox {
+      try? FileManager.default.removeItem(at: url)
+    }
   }
 
   static func importedFile(_ uri: String) throws -> URL {
@@ -178,8 +195,7 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
       imports.async {
         let missing = uris.prefix(10).filter { uri in
           guard let url = try? Self.importLocation(uri) else { return true }
-          var info = stat()
-          return lstat(url.path, &info) == -1 && (errno == ENOENT || errno == ENOTDIR)
+          return !FileManager.default.fileExists(atPath: url.path)
         }
         DispatchQueue.main.async { result(Array(missing)) }
       }
@@ -208,12 +224,7 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
       result(FlutterError(code: "picker", message: "파일 선택기를 열 수 없습니다.", details: nil))
       return
     }
-    let picker: UIDocumentPickerViewController
-    if #available(iOS 14.0, *) {
-      picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: false)
-    } else {
-      picker = UIDocumentPickerViewController(documentTypes: ["public.data"], in: .open)
-    }
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: false)
     picker.delegate = self
     picker.allowsMultipleSelection = false
     pickerResult = result
@@ -359,6 +370,7 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
           outcome = .failure(error as? DocumentError ?? .invalidFile)
         }
       }
+      Self.removeInboxCopy(source)
       let result = outcome
       DispatchQueue.main.async { completion(result) }
     }
@@ -379,6 +391,9 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
     var folder = importDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     let target = folder.appendingPathComponent(filename)
     let files = FileManager.default
+    // The same name and bytes reuse one copy, so opening a file again keeps one recent entry.
+    var hash = SHA256()
+    hash.update(data: Data(filename.utf8) + [0])
     try files.createDirectory(at: folder, withIntermediateDirectories: true)
     do {
       var privateCopy = URLResourceValues()
@@ -407,8 +422,22 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
             offset += written
           }
         }
+        hash.update(data: buffer[..<count])
       }
-      return ["uri": importIdentifier(target), "name": filename, "extension": fileExtension]
+      let digest = Array(hash.finalize())
+      let identity = UUID(uuid: (
+        digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+        digest[8], digest[9], digest[10], digest[11], digest[12], digest[13], digest[14], digest[15]
+      ))
+      let stored = importDirectory.appendingPathComponent(identity.uuidString, isDirectory: true)
+      let storedFile = stored.appendingPathComponent(filename)
+      if files.fileExists(atPath: storedFile.path) {
+        try? files.removeItem(at: folder)
+      } else {
+        try? files.removeItem(at: stored)
+        try files.moveItem(at: folder, to: stored)
+      }
+      return ["uri": importIdentifier(storedFile), "name": filename, "extension": fileExtension]
     } catch {
       try? files.removeItem(at: folder)
       throw error

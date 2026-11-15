@@ -191,6 +191,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
   }
 
   deinit {
+    printResult?(FlutterError(code: "print", message: "PDF 준비가 취소됐습니다.", details: nil))
     channel.setMethodCallHandler(nil)
     startupTimeout?.cancel()
     printTimeout?.cancel()
@@ -373,12 +374,7 @@ private final class DocumentWebView: NSObject, FlutterPlatformView, WKNavigation
           renderer.drawPage(at: page, in: renderer.paperRect)
         }
       }
-      let picker: UIDocumentPickerViewController
-      if #available(iOS 14.0, *) {
-        picker = UIDocumentPickerViewController(forExporting: [output], asCopy: true)
-      } else {
-        picker = UIDocumentPickerViewController(url: output, in: .exportToService)
-      }
+      let picker = UIDocumentPickerViewController(forExporting: [output], asCopy: true)
       picker.delegate = self
       presenter.present(picker, animated: true)
     } catch {
