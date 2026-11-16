@@ -8,6 +8,8 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>꼬미</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Allow tracking to see ads that are more relevant to you. Kkomi stays free with ads, and your documents never leave your device.</string>
 	<key>GADApplicationIdentifier</key>
 	<string>$(ADMOB_APP_ID)</string>
 	<key>SKAdNetworkItems</key>

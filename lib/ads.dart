@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'localization.dart';
@@ -55,6 +56,14 @@ Future<void> _initializeAds() async {
     }
   } catch (error) {
     debugPrint('AdMob consent form unavailable: $error');
+  }
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    try {
+      // App Store review requires the ATT prompt before any ad request.
+      await const MethodChannel('kkomi/tracking').invokeMethod<void>('request');
+    } on PlatformException catch (error) {
+      debugPrint('Tracking authorization unavailable: $error');
+    }
   }
   await _refreshConsent();
 }
