@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kkomi/ads.dart';
 import 'package:kkomi/documents.dart';
 import 'package:kkomi/home_tips.dart';
 import 'package:kkomi/home_strings.dart';
@@ -16,6 +17,13 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 void main() {
+  testWidgets('광고가 로드되기 전에도 배너 높이를 미리 확보한다', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(bottomNavigationBar: AdBanner())),
+    );
+    expect(tester.getSize(find.byType(AdBanner)).height, 50);
+  });
+
   testWidgets('10개 언어로 좁은 화면의 홈과 설정을 표시한다', (tester) async {
     SharedPreferences.setMockInitialValues({});
     SharedPreferencesAsyncPlatform.instance =
@@ -102,7 +110,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('파일 열기'), findsOneWidget);
-    expect(find.text('최근 문서 (최대 10개)'), findsOneWidget);
+    expect(find.text('최근 문서 (최대 50개)'), findsOneWidget);
     expect(find.text('파일을 열면 여기에 표시돼요'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.settings));
     await tester.pumpAndSettle();

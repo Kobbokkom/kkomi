@@ -193,11 +193,11 @@ final class DocumentAccess: NSObject, UIDocumentPickerDelegate, PHPickerViewCont
     case "findMissingRecentDocuments":
       let uris = call.arguments as? [String] ?? []
       imports.async {
-        let missing = uris.prefix(10).filter { uri in
+        let missing = uris.filter { uri in
           guard let url = try? Self.importLocation(uri) else { return true }
           return !FileManager.default.fileExists(atPath: url.path)
         }
-        DispatchQueue.main.async { result(Array(missing)) }
+        DispatchQueue.main.async { result(missing) }
       }
     case "forget":
       if let uri = document?["uri"], let url = try? Self.importLocation(uri) {

@@ -34,12 +34,13 @@ bool _privacyFormOpen = false;
 
 Future<void> initializeAds() => _initialization ??= _initializeAds();
 
+bool get _adsEnabled =>
+    !kIsWeb &&
+    _bannerId.isNotEmpty &&
+    !(kDebugMode && const bool.fromEnvironment('KKOMI_CAPTURE_SCREENSHOTS'));
+
 Future<void> _initializeAds() async {
-  if (kIsWeb ||
-      _bannerId.isEmpty ||
-      (kDebugMode && const bool.fromEnvironment('KKOMI_CAPTURE_SCREENSHOTS'))) {
-    return;
-  }
+  if (!_adsEnabled) return;
 
   final updated = Completer<bool>();
   ConsentInformation.instance.requestConsentInfoUpdate(
@@ -142,17 +143,21 @@ class AdBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: _adsAllowed,
-      builder: (context, allowed, _) {
-        if (!allowed) return const SizedBox.shrink();
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < AdSize.banner.width) {
-              return const SizedBox.shrink();
-            }
-            return const _BottomBanner();
-          },
+    if (!_adsEnabled) return const SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < AdSize.banner.width) {
+          return const SizedBox.shrink();
+        }
+        // Reserve the banner height up front so content does not jump when
+        // consent finishes or the ad arrives.
+        return SizedBox(
+          height: AdSize.banner.height.toDouble(),
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _adsAllowed,
+            builder: (context, allowed, _) =>
+                allowed ? const _BottomBanner() : const SizedBox.shrink(),
+          ),
         );
       },
     );

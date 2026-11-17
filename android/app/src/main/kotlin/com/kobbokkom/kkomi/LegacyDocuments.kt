@@ -51,7 +51,7 @@ internal fun findMissingRecentDocuments(context: Context, entries: List<*>): Lis
     val readable = resolver.persistedUriPermissions.filter { it.isReadPermission }.map { it.uri }.toSet()
     val primaryMounted = !Environment.isExternalStorageRemovable() &&
         Environment.getExternalStorageState() in setOf(Environment.MEDIA_MOUNTED, Environment.MEDIA_MOUNTED_READ_ONLY)
-    return entries.asSequence().filterIsInstance<String>().take(10).filter { raw ->
+    return entries.asSequence().filterIsInstance<String>().filter { raw ->
         val uri = Uri.parse(raw)
         if (uri.scheme != "content") return@filter false
         when {

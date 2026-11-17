@@ -20,6 +20,7 @@ import 'document_viewer.dart';
 const _muted = Color(0xFF716D63);
 const _appBackground = Color(0xFFFFFDF6);
 const _radius = 18.0;
+const _maxRecent = 50;
 const _preferencesKey = 'document-history';
 const _legacyHistoryPendingKey = 'legacy-document-history-pending';
 const _systemViewerKey = 'prefer-system-viewer';
@@ -95,7 +96,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       final history = <Document>[];
-      for (final entry in (saved ?? []).take(10)) {
+      for (final entry in (saved ?? []).take(_maxRecent)) {
         try {
           history.add(Document.fromMap(jsonDecode(entry) as Map));
         } catch (_) {
@@ -117,7 +118,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
           : null;
       final activity = HomeActivity.decode(activityData ?? legacy?.activity);
       setState(() {
-        _history.addAll(history.take(10));
+        _history.addAll(history.take(_maxRecent));
         _historyLoaded = true;
         _preferSystem = preferSystem ?? migratedPreference ?? !Platform.isIOS;
         _activity = activity;
@@ -319,7 +320,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
     setState(() {
       _history.removeWhere((entry) => entry.uri == document.uri);
       _history.insert(0, document.opened(DateTime.now()));
-      if (_history.length > 10) removed = _history.removeLast();
+      if (_history.length > _maxRecent) removed = _history.removeLast();
     });
     await _saveHistory();
     final stale = removed;
@@ -518,20 +519,7 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
               tip: homeTip(languageOf(context), _tipIndex),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_t('문서'), style: sectionTitle),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    _t('HWP · HWPX 오프라인 열람'),
-                    textAlign: TextAlign.end,
-                    style: const TextStyle(fontSize: 11, color: _muted),
-                  ),
-                ),
-              ],
-            ),
+            Text(_t('문서'), style: sectionTitle),
             const SizedBox(height: 8),
             _HomeCard(
               child: Padding(
@@ -545,7 +533,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            _t('최근 문서 (최대 10개)'),
+                            _t(
+                              '최근 문서 (최대 {n}개)',
+                            ).replaceAll('{n}', '$_maxRecent'),
                             style: sectionTitle,
                           ),
                         ),
