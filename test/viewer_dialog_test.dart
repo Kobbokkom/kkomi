@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kkomi/ads.dart';
 import 'package:kkomi/documents.dart';
 import 'package:kkomi/localization.dart';
 import 'package:kkomi/screens/document_viewer.dart';
@@ -63,9 +64,14 @@ void main() {
     await tester.pump();
     await report('ready', 4);
 
+    final banner = find.byType(AdBanner);
+    final bannerSlot = tester.element(banner);
+    expect(tester.getSize(banner).height, 50);
     await report('password', true);
     tester.view.viewInsets = const FakeViewPadding(bottom: 262);
     await tester.pumpAndSettle();
+    expect(tester.element(banner), same(bannerSlot));
+    expect(tester.getSize(banner).height, 0);
     final error = find.text('Das Passwort ist falsch.');
     await tester.ensureVisible(error);
     await tester.pumpAndSettle();
@@ -121,6 +127,10 @@ void main() {
     expect(find.byTooltip('Nächster Treffer').hitTestable(), findsOneWidget);
     expect(find.byTooltip('Suche schließen').hitTestable(), findsOneWidget);
     expect(tester.widget<EditableText>(field).focusNode.hasFocus, isTrue);
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(tester.element(banner), same(bannerSlot));
+    expect(tester.getSize(banner).height, 50);
     expect(tester.takeException(), isNull);
   });
 

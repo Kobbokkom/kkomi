@@ -549,6 +549,8 @@ class _DocumentViewerState extends State<DocumentViewer> {
   @override
   Widget build(BuildContext context) {
     final ready = _pageCount > 0 && _error == null;
+    final showBanner =
+        !_bottomSearch || MediaQuery.viewInsetsOf(context).bottom == 0;
     const viewType = 'kkomi/viewer';
     const creationParamsCodec = StandardMessageCodec();
     final creationParams = {
@@ -752,10 +754,11 @@ class _DocumentViewerState extends State<DocumentViewer> {
           if (ready && _bottomSearch) _documentToolbar(),
         ],
       ),
-      bottomNavigationBar:
-          _bottomSearch && MediaQuery.viewInsetsOf(context).bottom > 0
-          ? null
-          : const SafeArea(top: false, child: AdBanner()),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        bottom: showBanner,
+        child: AdBanner(visible: showBanner),
+      ),
     );
   }
 }

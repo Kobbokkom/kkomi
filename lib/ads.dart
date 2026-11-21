@@ -139,24 +139,27 @@ class AdPrivacyOptions extends StatelessWidget {
 }
 
 class AdBanner extends StatelessWidget {
-  const AdBanner({super.key});
+  const AdBanner({super.key, this.visible = true});
+
+  final bool visible;
 
   @override
   Widget build(BuildContext context) {
     if (!_adsEnabled) return const SizedBox.shrink();
+    final isCurrentRoute = ModalRoute.isCurrentOf(context) ?? true;
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < AdSize.banner.width) {
-          return const SizedBox.shrink();
-        }
+        final showBanner =
+            visible && constraints.maxWidth >= AdSize.banner.width;
         // Reserve the banner height up front so content does not jump when
         // consent finishes or the ad arrives.
         return SizedBox(
-          height: AdSize.banner.height.toDouble(),
+          height: showBanner ? AdSize.banner.height.toDouble() : 0,
           child: ValueListenableBuilder<bool>(
             valueListenable: _adsAllowed,
-            builder: (context, allowed, _) =>
-                allowed ? const _BottomBanner() : const SizedBox.shrink(),
+            builder: (context, allowed, _) => allowed
+                ? _BottomBanner(visible: showBanner && isCurrentRoute)
+                : const SizedBox.shrink(),
           ),
         );
       },
@@ -165,7 +168,9 @@ class AdBanner extends StatelessWidget {
 }
 
 class _BottomBanner extends StatefulWidget {
-  const _BottomBanner();
+  const _BottomBanner({required this.visible});
+
+  final bool visible;
 
   @override
   State<_BottomBanner> createState() => _BottomBannerState();
@@ -174,6 +179,7 @@ class _BottomBanner extends StatefulWidget {
 class _BottomBannerState extends State<_BottomBanner> {
   BannerAd? _ad;
   bool _loaded = false;
+  bool _requested = false;
 
   @override
   void initState() {
@@ -181,7 +187,15 @@ class _BottomBannerState extends State<_BottomBanner> {
     unawaited(_load());
   }
 
+  @override
+  void didUpdateWidget(covariant _BottomBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    unawaited(_load());
+  }
+
   Future<void> _load() async {
+    if (!widget.visible || _requested) return;
+    _requested = true;
     try {
       final ad = BannerAd(
         adUnitId: _bannerId,
@@ -221,7 +235,9 @@ class _BottomBannerState extends State<_BottomBanner> {
   @override
   Widget build(BuildContext context) {
     final ad = _ad;
-    if (ad == null || !_loaded) return const SizedBox.shrink();
+    if (!widget.visible || ad == null || !_loaded) {
+      return const SizedBox.shrink();
+    }
     return Center(
       heightFactor: 1,
       child: SizedBox(
